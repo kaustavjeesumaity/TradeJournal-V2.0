@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm mt-5">
+      <div class="card-header bg-info text-white">Position Size Calculator</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="balance" class="form-label">Account Balance</label>
+            <input type="number" step="0.01" name="balance" id="balance" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="risk_pct" class="form-label">Risk % per Trade</label>
+            <input type="number" step="0.01" name="risk_pct" id="risk_pct" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="entry_price" class="form-label">Entry Price</label>
+            <input type="number" step="0.0001" name="entry_price" id="entry_price" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="stop_price" class="form-label">Stop Loss Price</label>
+            <input type="number" step="0.0001" name="stop_price" id="stop_price" class="form-control" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Calculate</button>
+          <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+        </form>
+        {% if position_size is not None %}
+        <div class="alert alert-success mt-3">
+          <strong>Position Size:</strong> {{ position_size|floatformat:2 }} units
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

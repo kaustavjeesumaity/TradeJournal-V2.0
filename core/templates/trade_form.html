@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="card shadow-sm mt-4">
+      <div class="card-header bg-primary text-white">{% if edit %}Edit Trade{% else %}Add Trade{% endif %}</div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          {{ form.as_p }}
+          {% if edit and trade.attachments.all %}
+            <div class="mb-2">
+              <label>Existing Attachments:</label>
+              <ul>
+                {% for att in trade.attachments.all %}
+                  <li><a href="{{ att.file.url }}" target="_blank">{{ att.file.name|slice:'15:' }}</a> (uploaded {{ att.uploaded_at|date:'Y-m-d H:i' }})</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+          <button type="submit" class="btn btn-success">Save</button>
+        </form>
+      </div>
+    </div>
+    <div class="mt-3">
+      <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
