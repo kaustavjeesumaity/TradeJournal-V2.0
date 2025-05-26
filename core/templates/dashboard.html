@@ -57,13 +57,18 @@
 
   <form method="get" class="row g-2 mb-3 align-items-end">
     <div class="col-md-2">
-      <input type="text" name="instrument" class="form-control" placeholder="Instrument" value="{{ filter.instrument }}">
+      <select name="account_number" class="form-select">
+        {% for pk, name in account_options %}
+          <option value="{{ pk }}" {% if filter.account_number == pk|stringformat:"s" %}selected{% elif not filter.account_number and pk == default_account %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div class="col-md-2">
-      <select name="outcome" class="form-select">
-        <option value="">All Outcomes</option>
-        <option value="win" {% if filter.outcome == 'win' %}selected{% endif %}>Win</option>
-        <option value="loss" {% if filter.outcome == 'loss' %}selected{% endif %}>Loss</option>
+      <select name="instrument" class="form-select">
+        <option value="">All Instruments</option>
+        {% for inst in instrument_list %}
+          <option value="{{ inst }}" {% if filter.instrument == inst %}selected{% endif %}>{{ inst }}</option>
+        {% endfor %}
       </select>
     </div>
     <div class="col-md-2">
@@ -71,6 +76,13 @@
     </div>
     <div class="col-md-2">
       <input type="date" name="end_date" class="form-control" value="{{ filter.end_date }}">
+    </div>
+    <div class="col-md-2">
+      <select name="outcome" class="form-select">
+        <option value="">All Outcomes</option>
+        <option value="win" {% if filter.outcome == 'win' %}selected{% endif %}>Win</option>
+        <option value="loss" {% if filter.outcome == 'loss' %}selected{% endif %}>Loss</option>
+      </select>
     </div>
     <div class="col-md-2">
       <select name="sort" class="form-select">

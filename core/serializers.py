@@ -15,4 +15,8 @@ class TradeSerializer(serializers.ModelSerializer):
     attachments = TradeAttachmentSerializer(many=True, read_only=True)
     class Meta:
         model = Trade
-        fields = ['id', 'account', 'instrument', 'entry_price', 'exit_price', 'entry_date', 'exit_date', 'quantity', 'notes', 'tags', 'attachments']
+        fields = [
+            'id', 'account', 'instrument', 'entry_price', 'exit_price',
+            'entry_date', 'exit_date', 'quantity', 'notes', 'tags', 'attachments',
+            'gross_pnl', 'charges', 'net_pnl'
+        ]

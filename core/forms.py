@@ -24,9 +24,15 @@ class AccountForm(forms.ModelForm):
 
 class TradeForm(forms.ModelForm):
     attachment = forms.FileField(required=False, label='Attachment (image/pdf)', widget=forms.ClearableFileInput(attrs={'accept': 'image/*,application/pdf'}))
+    gross_pnl = forms.DecimalField(label='Gross P&L', required=False)
+    charges = forms.DecimalField(label='Charges', required=False)
     class Meta:
         model = Trade
-        fields = ['account', 'instrument', 'entry_price', 'exit_price', 'entry_date', 'exit_date', 'quantity', 'notes', 'tags']
+        fields = [
+            'account', 'instrument', 'entry_price', 'exit_price',
+            'entry_date', 'exit_date', 'quantity', 'notes', 'tags',
+            'gross_pnl', 'charges'
+        ]
 
 class MT5FetchForm(forms.Form):
     mt5_account = forms.CharField(label='MT5 Account Number')

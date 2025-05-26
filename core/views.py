@@ -3,7 +3,7 @@ from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
 from .forms import CustomUserCreationForm, CustomAuthenticationForm, AccountForm, TradeForm, MT5FetchForm
 from .forms_profile import ProfileForm
-from .models import Account, Trade, TradeAttachment
+from .models import Account, Trade, TradeAttachment, Instrument
 from django.urls import reverse
 from django.db.models import Sum, Count, Q, F, ExpressionWrapper, DecimalField
 from django.utils.dateparse import parse_date
@@ -24,6 +24,7 @@ except ImportError:
     mt5 = None
 from rest_framework import viewsets, permissions
 from .serializers import AccountSerializer, TradeSerializer
+import datetime
 
 def register_view(request):
     if request.method == 'POST':
@@ -60,16 +61,24 @@ def dashboard_view(request):
     # Filtering
     instrument = request.GET.get('instrument', '')
     outcome = request.GET.get('outcome', '')
-    start_date = request.GET.get('start_date', '')
-    end_date = request.GET.get('end_date', '')
+    account_number = request.GET.get('account_number', '')
+    start_date = request.GET.get('start_date', datetime.date.today().isoformat())
+    end_date = request.GET.get('end_date', datetime.date.today().isoformat())
     sort = request.GET.get('sort', 'exit_date')
 
     if instrument:
-        trades = trades.filter(instrument__icontains=instrument)
+        trades = trades.filter(instrument=instrument)
     if outcome == 'win':
         trades = trades.filter(exit_price__gt=F('entry_price'))
     elif outcome == 'loss':
         trades = trades.filter(exit_price__lt=F('entry_price'))
+    if account_number:
+        try:
+            account_number_int = int(account_number)
+            trades = trades.filter(account__pk=account_number_int)
+        except ValueError:
+            # Ignore filter if account_number is not an integer (e.g., legacy or invalid value)
+            pass
     if start_date:
         trades = trades.filter(exit_date__date__gte=parse_date(start_date))
     if end_date:
@@ -157,6 +166,12 @@ def dashboard_view(request):
             'pnl': pnl,
         })
 
+    # For filter dropdowns
+    instrument_list = list(Instrument.objects.values_list('name', flat=True).order_by('name'))
+    # Show all account names in the dropdown, but use account.pk as the value for filtering
+    account_options = [(account.pk, account.name) for account in accounts]
+    default_account = account_options[0][0] if account_options else ''
+
     return render(request, 'dashboard.html', {
         'accounts': accounts,
         'account_summaries': account_summaries,
@@ -170,6 +185,7 @@ def dashboard_view(request):
         'filter': {
             'instrument': instrument,
             'outcome': outcome,
+            'account_number': account_number,
             'start_date': start_date,
             'end_date': end_date,
             'sort': sort,
@@ -178,6 +194,9 @@ def dashboard_view(request):
         'conversion_rates': conversion_rates,
         'instrument_stats': instrument_stats,
         'outcome_stats': outcome_stats,
+        'instrument_list': instrument_list,
+        'account_options': account_options,
+        'default_account': default_account,
     })
 
 @login_required
@@ -205,6 +224,13 @@ def trade_create_view(request):
         form.fields['account'].queryset = Account.objects.filter(user=request.user)
         if form.is_valid():
             trade = form.save(commit=False)
+            # Calculate net_pnl if gross_pnl and charges are provided
+            gross_pnl = form.cleaned_data.get('gross_pnl')
+            charges = form.cleaned_data.get('charges')
+            if gross_pnl is not None and charges is not None:
+                trade.gross_pnl = gross_pnl
+                trade.charges = charges
+                trade.net_pnl = gross_pnl - charges
             if trade.account.user == request.user:
                 trade.save()
                 form.save_m2m()
@@ -247,7 +273,16 @@ def trade_edit_view(request, pk):
         form = TradeForm(request.POST, request.FILES, instance=trade)
         form.fields['account'].queryset = Account.objects.filter(user=request.user)
         if form.is_valid():
-            trade = form.save()
+            trade = form.save(commit=False)
+            # Calculate net_pnl if gross_pnl and charges are provided
+            gross_pnl = form.cleaned_data.get('gross_pnl')
+            charges = form.cleaned_data.get('charges')
+            if gross_pnl is not None and charges is not None:
+                trade.gross_pnl = gross_pnl
+                trade.charges = charges
+                trade.net_pnl = gross_pnl - charges
+            trade.save()
+            form.save_m2m()
             # Handle new attachment
             attachment = form.cleaned_data.get('attachment')
             if attachment:
@@ -383,23 +418,50 @@ def fetch_mt5_trades(request):
                         message = 'No trades found or error fetching trades.'
                     else:
                         latest_trade_time = last_fetch
+                        # Aggregate deals into trades by position_id
+                        deals_by_position = defaultdict(list)
                         for order in orders:
-                            # Only add trades that don't already exist (by ticket)
-                            if not Trade.objects.filter(account=account, notes__contains=f"MT5 ticket: {order.ticket}").exists():
-                                trade = Trade.objects.create(
-                                    account=account,
-                                    instrument=order.symbol,
-                                    entry_price=order.price,
-                                    exit_price=order.price,
-                                    entry_date=order.time,
-                                    exit_date=order.time,
-                                    quantity=order.volume,
-                                    notes=f"MT5 ticket: {order.ticket}"
-                                )
-                                trades_fetched += 1
-                                # Track latest trade time
-                                if not latest_trade_time or order.time > latest_trade_time:
-                                    latest_trade_time = order.time
+                            # Only consider buy/sell deals (type 0/1)
+                            if hasattr(order, 'type') and order.type in (0, 1):
+                                deals_by_position[getattr(order, 'position_id', None)].append(order)
+                        for position_id, deals in deals_by_position.items():
+                            if not deals or position_id is None:
+                                continue
+                            # Sort deals by time
+                            deals = sorted(deals, key=lambda d: d.time)
+                            entry_deal = deals[0]
+                            exit_deal = deals[-1]
+                            # Aggregate P&L and charges from all deals in this position
+                            gross_pnl = sum(getattr(d, 'profit', 0) for d in deals)
+                            charges = sum((getattr(d, 'commission', 0) or 0) + (getattr(d, 'swap', 0) or 0) + (getattr(d, 'fee', 0) or 0) for d in deals)
+                            net_pnl = gross_pnl - charges
+                            # Convert times
+                            entry_time = datetime.fromtimestamp(entry_deal.time, tz=timezone.utc) if isinstance(entry_deal.time, (int, float)) else entry_deal.time
+                            exit_time = datetime.fromtimestamp(exit_deal.time, tz=timezone.utc) if isinstance(exit_deal.time, (int, float)) else exit_deal.time
+                            # Check if trade already exists (by position_id in notes)
+                            if Trade.objects.filter(account=account, notes__contains=f"MT5 position: {position_id}").exists():
+                                continue
+                            # Add instrument to Instrument model if not exists
+                            instrument_name = getattr(entry_deal, 'symbol', '')
+                            if instrument_name and not Instrument.objects.filter(name=instrument_name).exists():
+                                Instrument.objects.create(name=instrument_name)
+                            Trade.objects.create(
+                                account=account,
+                                instrument=instrument_name,
+                                entry_price=getattr(entry_deal, 'price', 0),
+                                exit_price=getattr(exit_deal, 'price', 0),
+                                entry_date=entry_time,
+                                exit_date=exit_time,
+                                quantity=getattr(entry_deal, 'volume', 0),
+                                notes=f"MT5 position: {position_id}, entry ticket: {getattr(entry_deal, 'ticket', '')}, exit ticket: {getattr(exit_deal, 'ticket', '')}",
+                                gross_pnl=gross_pnl,
+                                charges=charges,
+                                net_pnl=gross_pnl-charges
+                            )
+                            trades_fetched += 1
+                            # Track latest trade time
+                            if not latest_trade_time or exit_time > latest_trade_time:
+                                latest_trade_time = exit_time
                         # Update last fetch timestamp
                         if latest_trade_time:
                             account.mt5_last_fetch = latest_trade_time

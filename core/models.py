@@ -33,6 +33,11 @@ class Tag(models.Model):
     def __str__(self):
         return self.name
 
+class Instrument(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    def __str__(self):
+        return self.name
+
 class Trade(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE, related_name='trades')
     instrument = models.CharField(max_length=100)
@@ -43,10 +48,19 @@ class Trade(models.Model):
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField('Tag', blank=True)
+    gross_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    net_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     @property
     def pnl(self):
-        return (self.exit_price - self.entry_price) * self.quantity
+        return self.net_pnl
+
+    # Add a property for instrument object if needed
+    @property
+    def instrument_obj(self):
+        from .models import Instrument
+        return Instrument.objects.filter(name=self.instrument).first()
 
     def __str__(self):
         return f"{self.instrument} ({self.entry_date.date()} - {self.exit_date.date()})"
