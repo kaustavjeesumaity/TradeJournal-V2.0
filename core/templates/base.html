@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Trading Journal{% endblock %}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     body { background: var(--bs-body-bg, #f8f9fa); }
     .navbar-brand { font-weight: bold; }
@@ -48,25 +49,78 @@
       color: #e9ecef;
       border-color: #444c56;
     }
+    body[data-bs-theme="dark"] {
+      --bs-body-bg: #181a1b;
+      --bs-card-bg: #23272b;
+      --bs-table-bg: #23272b;
+      --bs-table-striped-bg: #23272b;
+      --bs-table-hover-bg: #23272b;
+      --bs-list-group-bg: #23272b;
+      color-scheme: dark;
+    }
+    body[data-bs-theme="dark"] .card,
+    body[data-bs-theme="dark"] .table,
+    body[data-bs-theme="dark"] .list-group-item {
+      background-color: var(--bs-card-bg) !important;
+      color: #f8f9fa;
+    }
+    body[data-bs-theme="dark"] .card-header,
+    body[data-bs-theme="dark"] .table thead th {
+      background-color: #23272b !important;
+      color: #f8f9fa;
+    }
+    body[data-bs-theme="dark"] .btn-outline-secondary,
+    body[data-bs-theme="dark"] .btn-outline-primary,
+    body[data-bs-theme="dark"] .btn-outline-danger {
+      color: #f8f9fa;
+      border-color: #6c757d;
+    }
+    body[data-bs-theme="dark"] .btn-outline-secondary:hover,
+    body[data-bs-theme="dark"] .btn-outline-primary:hover,
+    body[data-bs-theme="dark"] .btn-outline-danger:hover {
+      background: #23272b;
+      color: #fff;
+    }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+<body data-bs-theme="light">
+<nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm mb-4">
   <div class="container-fluid">
-    <a class="navbar-brand" href="{% url 'dashboard' %}">Trading Journal</a>
-    <div class="collapse navbar-collapse">
-      <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+    <a class="navbar-brand fw-bold" href="{% url 'dashboard' %}"><i class="bi bi-bar-chart-line"></i> Trade Journal</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
         {% if user.is_authenticated %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'profile' %}">Profile</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-house"></i> Dashboard</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'advanced_analytics' %}"><i class="bi bi-bar-chart-line"></i> Advanced Analytics</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'daily_checklist' %}"><i class="bi bi-calendar-check"></i> Daily Checklist</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'profile' %}"><i class="bi bi-person"></i> Profile</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i> Logout</a>
+        </li>
         {% else %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Login</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'register' %}">Register</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right"></i> Login</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'register' %}"><i class="bi bi-person-plus"></i> Register</a>
+        </li>
         {% endif %}
+        <li class="nav-item ms-3">
+          <button id="themeToggle" class="btn btn-outline-secondary btn-sm" type="button" title="Toggle light/dark mode"><i class="bi bi-moon"></i></button>
+        </li>
       </ul>
-      <button id="theme-toggle" class="btn btn-outline-light btn-sm ms-3" type="button">🌙</button>
     </div>
   </div>
 </nav>
@@ -81,29 +135,20 @@
   {% endif %}
   {% block content %}{% endblock %}
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   // Dark mode toggle
-  const themeToggle = document.getElementById('theme-toggle');
-  const html = document.documentElement;
-  function setTheme(theme) {
-    html.setAttribute('data-bs-theme', theme);
-    localStorage.setItem('theme', theme);
-    themeToggle.innerText = theme === 'dark' ? '☀️' : '🌙';
-  }
+  const themeToggle = document.getElementById('themeToggle');
+  const body = document.body;
   themeToggle.addEventListener('click', function() {
-    const current = html.getAttribute('data-bs-theme');
-    setTheme(current === 'dark' ? 'light' : 'dark');
-  });
-  // On load, set theme from localStorage or system
-  (function() {
-    const saved = localStorage.getItem('theme');
-    if (saved) {
-      setTheme(saved);
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
+    if (body.getAttribute('data-bs-theme') === 'dark') {
+      body.setAttribute('data-bs-theme', 'light');
+      themeToggle.innerHTML = '<i class="bi bi-moon"></i>';
+    } else {
+      body.setAttribute('data-bs-theme', 'dark');
+      themeToggle.innerHTML = '<i class="bi bi-sun"></i>';
     }
-  })();
+  });
 </script>
 {% block extra_js %}{% endblock %}
 </body>

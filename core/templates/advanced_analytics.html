@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4">
+  <h2 class="fw-bold mb-4">Advanced Analytics & Insights</h2>
+
+  <div class="row g-4">
+    <!-- Performance Charts -->
+    <div class="col-md-6">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-primary text-white">PnL Over Time</div>
+        <div class="card-body">
+          <canvas id="pnlChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-success text-white">Win/Loss Ratio</div>
+        <div class="card-body">
+          <canvas id="winLossChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-info text-white">Avg. Holding Period</div>
+        <div class="card-body">
+          <canvas id="holdingPeriodChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tag/Session/Checklist Analysis -->
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-secondary text-white">Performance by Tag</div>
+        <div class="card-body">
+          <canvas id="tagPerformanceChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-dark text-white">Performance by Session</div>
+        <div class="card-body">
+          <canvas id="sessionPerformanceChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Streaks & Milestones -->
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-warning text-dark">Streaks</div>
+        <div class="card-body">
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">Longest Winning Streak: <strong>{{ streaks.longest_win }}</strong></li>
+            <li class="list-group-item">Longest Losing Streak: <strong>{{ streaks.longest_loss }}</strong></li>
+            <li class="list-group-item">Current Streak: <strong>{{ streaks.current }}</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-success text-white">Best Trade</div>
+        <div class="card-body">
+          {% if best_trade %}
+          <div>
+            <span class="fw-bold">{{ best_trade.instrument }}</span> ({{ best_trade.entry_date|date:'Y-m-d' }})<br>
+            PnL: <span class="text-success fw-bold">{{ best_trade.pnl|floatformat:2 }}</span>
+          </div>
+          {% else %}
+          <span>No data</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-danger text-white">Worst Trade</div>
+        <div class="card-body">
+          {% if worst_trade %}
+          <div>
+            <span class="fw-bold">{{ worst_trade.instrument }}</span> ({{ worst_trade.entry_date|date:'Y-m-d' }})<br>
+            PnL: <span class="text-danger fw-bold">{{ worst_trade.pnl|floatformat:2 }}</span>
+          </div>
+          {% else %}
+          <span>No data</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Milestones -->
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-info text-white">Milestone Achievements</div>
+        <div class="card-body">
+          <ul class="list-group list-group-flush">
+            {% for milestone in milestones %}
+              <li class="list-group-item">{{ milestone }}</li>
+            {% empty %}
+              <li class="list-group-item">No milestones yet.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JSON script tags for chart data -->
+{{ pnl_dates|json_script:"pnlDates" }}
+{{ pnl_values|json_script:"pnlValues" }}
+{{ win_loss_data|json_script:"winLossData" }}
+{{ holding_labels|json_script:"holdingLabels" }}
+{{ holding_data|json_script:"holdingData" }}
+{{ tag_labels|json_script:"tagLabels" }}
+{{ tag_data|json_script:"tagData" }}
+{{ session_labels|json_script:"sessionLabels" }}
+{{ session_data|json_script:"sessionData" }}
+
+<!-- Chart.js scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+  $('#id_instrument').select2({
+    placeholder: 'Select instrument(s)',
+    allowClear: true,
+    width: '100%',
+  });
+  $('#id_tags').select2({
+    placeholder: 'Select tag(s)',
+    allowClear: true,
+    width: '100%',
+  });
+});
+
+// PnL Over Time
+const pnlLabels = JSON.parse(document.getElementById('pnlDates').textContent);
+const pnlData = JSON.parse(document.getElementById('pnlValues').textContent);
+new Chart(document.getElementById('pnlChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: pnlLabels,
+    datasets: [{
+      label: 'PnL',
+      data: pnlData,
+      borderColor: 'rgba(75,192,192,1)',
+      backgroundColor: 'rgba(75,192,192,0.2)',
+      fill: true,
+      tension: 0.1
+    }]
+  },
+  options: { responsive: true, plugins: { legend: { display: false } } }
+});
+
+// Win/Loss Ratio
+const winLossData = JSON.parse(document.getElementById('winLossData').textContent);
+new Chart(document.getElementById('winLossChart').getContext('2d'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Wins', 'Losses'],
+    datasets: [{
+      data: winLossData,
+      backgroundColor: ['#198754', '#dc3545']
+    }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+
+// Avg. Holding Period
+const holdingLabels = JSON.parse(document.getElementById('holdingLabels').textContent);
+const holdingData = JSON.parse(document.getElementById('holdingData').textContent);
+new Chart(document.getElementById('holdingPeriodChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: holdingLabels,
+    datasets: [{
+      label: 'Avg. Holding Period (hrs)',
+      data: holdingData,
+      backgroundColor: '#0dcaf0'
+    }]
+  },
+  options: { responsive: true, plugins: { legend: { display: false } } }
+});
+
+// Tag Performance
+const tagLabels = JSON.parse(document.getElementById('tagLabels').textContent);
+const tagData = JSON.parse(document.getElementById('tagData').textContent);
+new Chart(document.getElementById('tagPerformanceChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: tagLabels,
+    datasets: [{
+      label: 'PnL by Tag',
+      data: tagData,
+      backgroundColor: '#6610f2'
+    }]
+  },
+  options: { responsive: true, plugins: { legend: { display: false } } }
+});
+
+// Session Performance
+const sessionLabels = JSON.parse(document.getElementById('sessionLabels').textContent);
+const sessionData = JSON.parse(document.getElementById('sessionData').textContent);
+new Chart(document.getElementById('sessionPerformanceChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: sessionLabels,
+    datasets: [{
+      label: 'PnL by Session',
+      data: sessionData,
+      backgroundColor: '#212529'
+    }]
+  },
+  options: { responsive: true, plugins: { legend: { display: false } } }
+});
+</script>
+{% endblock %}

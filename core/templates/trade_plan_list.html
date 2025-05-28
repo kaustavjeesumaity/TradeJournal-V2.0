@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4">
+  <h2 class="fw-bold mb-4">Planned Trades</h2>
+  <div class="mb-3">
+    <a href="{% url 'trade_plan_create' %}" class="btn btn-primary rounded-pill">New Trade Plan</a>
+    <form method="get" class="d-inline ms-3">
+      <select name="status" class="form-select d-inline w-auto">
+        <option value="">All Statuses</option>
+        <option value="planned" {% if status == 'planned' %}selected{% endif %}>Planned</option>
+        <option value="executed" {% if status == 'executed' %}selected{% endif %}>Executed</option>
+        <option value="abandoned" {% if status == 'abandoned' %}selected{% endif %}>Abandoned</option>
+      </select>
+      <button type="submit" class="btn btn-outline-secondary rounded-pill ms-2">Filter</button>
+    </form>
+  </div>
+  <div class="row g-3">
+    {% for plan in plans %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h5 class="card-title"><a href="{% url 'trade_plan_detail' plan.pk %}" class="text-decoration-none text-primary">{{ plan.instrument }}</a></h5>
+          <div class="mb-2"><span class="badge bg-info">{{ plan.get_status_display }}</span></div>
+          <div class="mb-2 text-muted small">Planned: {{ plan.planned_at|date:'Y-m-d H:i' }}</div>
+          <div class="mb-2"><strong>Entry:</strong> {{ plan.planned_entry }} | <strong>Stop:</strong> {{ plan.planned_stop }} | <strong>Target:</strong> {{ plan.planned_target }}</div>
+          <div class="mb-2"><strong>Size:</strong> {{ plan.planned_size }}</div>
+          <div class="mb-2"><strong>Checklist:</strong> {{ plan.checklist_template }}</div>
+          <div class="mb-2"><strong>Custom:</strong> {{ plan.custom_checklist }}</div>
+          <div class="mb-2"><strong>Rationale:</strong> <span class="text-break">{{ plan.rationale|truncatechars:100 }}</span></div>
+          {% if plan.attachments.all %}
+          <div class="mb-2">
+            {% for att in plan.attachments.all %}
+              <img src="{{ att.image.url }}" alt="Attachment" class="img-thumbnail me-1 mb-1" style="max-width: 60px; max-height: 60px;">
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div class="mt-2">
+            <a href="{% url 'trade_plan_detail' plan.pk %}" class="btn btn-sm btn-outline-primary rounded-pill me-1">View</a>
+            <a href="{% url 'trade_plan_edit' plan.pk %}" class="btn btn-sm btn-outline-warning rounded-pill me-1">Edit</a>
+            <a href="{% url 'trade_plan_delete' plan.pk %}" class="btn btn-sm btn-outline-danger rounded-pill">Delete</a>
+          </div>
+        </div>
+        <div class="card-footer bg-light border-top-0 d-flex gap-2">
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+      <div class="alert alert-info">No trade plans found.</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

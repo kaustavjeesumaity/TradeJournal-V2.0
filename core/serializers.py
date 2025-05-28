@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Account, Trade, TradeAttachment
+from .models import Account, Trade, TradeAttachment, Tag, Session, ChecklistItem, Positive, Negative
 
 class AccountSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,11 +12,12 @@ class TradeAttachmentSerializer(serializers.ModelSerializer):
         fields = ['id', 'file', 'uploaded_at']
 
 class TradeSerializer(serializers.ModelSerializer):
+    tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all())
+    session = serializers.PrimaryKeyRelatedField(queryset=Session.objects.all(), allow_null=True)
+    checklist = serializers.PrimaryKeyRelatedField(many=True, queryset=ChecklistItem.objects.all())
+    positives = serializers.PrimaryKeyRelatedField(many=True, queryset=Positive.objects.all())
+    negatives = serializers.PrimaryKeyRelatedField(many=True, queryset=Negative.objects.all())
     attachments = TradeAttachmentSerializer(many=True, read_only=True)
     class Meta:
         model = Trade
-        fields = [
-            'id', 'account', 'instrument', 'entry_price', 'exit_price',
-            'entry_date', 'exit_date', 'quantity', 'notes', 'tags', 'attachments',
-            'gross_pnl', 'charges', 'net_pnl'
-        ]
+        fields = '__all__'

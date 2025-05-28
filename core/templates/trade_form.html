@@ -1,30 +1,216 @@
 {% extends 'base.html' %}
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+<style>
+  .card { border-radius: 1rem; box-shadow: 0 2px 16px 0 rgba(0,0,0,0.07); }
+  .card-header { border-top-left-radius: 1rem; border-top-right-radius: 1rem; font-size: 1.1rem; font-weight: 600; }
+  .form-label { font-weight: 500; }
+  .form-control, .form-select { border-radius: 0.5rem; }
+  .btn { border-radius: 0.5rem; }
+  .badge-pnl { font-size: 0.95em; padding: 0.4em 0.7em; border-radius: 0.5em; font-weight: 500; }
+  [data-bs-theme="dark"] .card, [data-bs-theme="dark"] .form-control, [data-bs-theme="dark"] .form-select {
+    background: #23272b;
+    color: #e9ecef;
+    border-color: #444c56;
+  }
+  [data-bs-theme="dark"] .card-header {
+    background: #181a1b;
+    color: #e9ecef;
+  }
+  /* Minimal custom style for badge and select2 */
+  .selected-multi-summary { margin-top: 0.5em; margin-bottom: 1em; }
+  .selected-multi-summary .badge {
+    border-radius: 8px;
+    font-size: 0.97em;
+    padding: 4px 12px 4px 10px;
+    margin-right: 4px;
+    margin-bottom: 2px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    box-shadow: 0 1px 4px #0001;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    background: var(--bs-primary, #0d6efd);
+    color: #fff;
+  }
+  .selected-multi-summary .badge.bg-success { background: var(--bs-success, #198754); }
+  .selected-multi-summary .badge.bg-danger { background: var(--bs-danger, #dc3545); }
+  .selected-multi-summary .badge .remove-badge {
+    position: absolute;
+    right: 6px;
+    top: 2px;
+    color: #fff;
+    background: rgba(0,0,0,0.18);
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .selected-multi-summary .badge .remove-badge:hover { background: #dc3545; }
+  .select2-container--default .select2-selection--multiple .select2-selection__choice { display: none !important; }
+  .select2-container { width: 100% !important; }
+  .attachment-thumb { max-width: 100px; max-height: 100px; object-fit: cover; border-radius: 0.5em; margin-right: 0.5em; }
+  /* --- Spacing improvements --- */
+  .trade-form-section .mb-3 { margin-bottom: 1.25rem !important; }
+  .trade-form-section .selected-multi-summary { margin-bottom: 0.75rem !important; }
+  .trade-form-section label, .trade-form-section .form-label { margin-bottom: 0.35rem !important; }
+  .trade-form-section .select2-container { margin-bottom: 0.2rem; }
+  .trade-form-section .d-flex.flex-wrap { gap: 0.75rem 1.25rem !important; }
+  .trade-form-section .position-relative { margin-bottom: 0.25rem; }
+  .trade-form-section .mt-2 { margin-top: 0.75rem !important; }
+  .trade-form-section .form-control, .trade-form-section .form-select { margin-bottom: 0 !important; }
+  @media (max-width: 767.98px) {
+    .trade-form-section .mb-3 { margin-bottom: 1rem !important; }
+    .trade-form-section .d-flex.flex-wrap { gap: 0.5rem 0.75rem !important; }
+  }
+</style>
+{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-7">
-    <div class="card shadow-sm mt-4">
-      <div class="card-header bg-primary text-white">{% if edit %}Edit Trade{% else %}Add Trade{% endif %}</div>
-      <div class="card-body">
-        <form method="post" enctype="multipart/form-data">
-          {% csrf_token %}
-          {{ form.as_p }}
-          {% if edit and trade.attachments.all %}
-            <div class="mb-2">
-              <label>Existing Attachments:</label>
-              <ul>
-                {% for att in trade.attachments.all %}
-                  <li><a href="{{ att.file.url }}" target="_blank">{{ att.file.name|slice:'15:' }}</a> (uploaded {{ att.uploaded_at|date:'Y-m-d H:i' }})</li>
-                {% endfor %}
-              </ul>
+<div class="container my-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex align-items-center">
+          <i class="bi bi-pencil-square me-2"></i> {% if trade %}Edit Trade{% else %}Add Trade{% endif %}
+        </div>
+        <div class="card-body trade-form-section">
+          <form method="post" enctype="multipart/form-data" id="tradeForm">
+            {% csrf_token %}
+            <div class="row g-4"> <!-- Changed g-3 to g-4 for more vertical spacing -->
+              <div class="col-md-6">
+                <div class="mb-3">{{ form.account.label_tag }}{{ form.account }}</div>
+                <div class="mb-3">{{ form.instrument.label_tag }}{{ form.instrument }}</div>
+                <div class="mb-3">{{ form.entry_price.label_tag }}{{ form.entry_price }}</div>
+                <div class="mb-3">{{ form.exit_price.label_tag }}{{ form.exit_price }}</div>
+                <div class="mb-3">{{ form.entry_date.label_tag }}{{ form.entry_date }}</div>
+                <div class="mb-3">{{ form.exit_date.label_tag }}{{ form.exit_date }}</div>
+                <div class="mb-3">{{ form.quantity.label_tag }}{{ form.quantity }}</div>
+                <div class="mb-3">{{ form.notes.label_tag }}{{ form.notes }}</div>
+                <div class="mb-3">{{ form.gross_pnl.label_tag }}{{ form.gross_pnl }}</div>
+                <div class="mb-3">{{ form.charges.label_tag }}{{ form.charges }}</div>
+                <div class="mb-3">{{ form.session.label_tag }}<div>{{ form.session }}</div></div>
+                <div class="mb-3">{{ form.checklist.label_tag }}<div>{{ form.checklist }}</div></div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="id_tags">Tags</label>
+                  <select multiple class="form-control select2-multi" id="id_tags" name="tags">
+                    {% for tag in form.fields.tags.queryset %}
+                      <option value="{{ tag.pk }}" {% if tag in form.initial.tags %}selected{% endif %}>{{ tag }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="selected-multi-summary" id="selected-summary-tags"></div>
+                </div>
+                <div class="mb-3">
+                  <label for="id_positives">Positives</label>
+                  <select multiple class="form-control select2-multi" id="id_positives" name="positives">
+                    {% for pos in form.fields.positives.queryset %}
+                      <option value="{{ pos.pk }}" {% if pos in form.initial.positives %}selected{% endif %}>{{ pos }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="selected-multi-summary" id="selected-summary-positives"></div>
+                </div>
+                <div class="mb-3">
+                  <label for="id_negatives">Negatives</label>
+                  <select multiple class="form-control select2-multi" id="id_negatives" name="negatives">
+                    {% for neg in form.fields.negatives.queryset %}
+                      <option value="{{ neg.pk }}" {% if neg in form.initial.negatives %}selected{% endif %}>{{ neg }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="selected-multi-summary" id="selected-summary-negatives"></div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.attachment.label }}</label>
+                  <input type="file" name="attachments" id="id_attachments" class="form-control" multiple>
+                  {% if trade and trade.attachments.all %}
+                  <div class="mt-2">
+                    <label class="form-label">Existing Attachments:</label>
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for attachment in trade.attachments.all %}
+                        <div class="position-relative me-2 mb-2">
+                          {% with ext=attachment.file.name|lower %}
+                            {% if ext|slice:'-4:' == '.jpg' or ext|slice:'-5:' == '.jpeg' or ext|slice:'-4:' == '.png' or ext|slice:'-4:' == '.gif' %}
+                              <a href="{{ attachment.file.url }}" target="_blank">
+                                <img src="{{ attachment.file.url }}" class="attachment-thumb" alt="Attachment">
+                              </a>
+                            {% else %}
+                              <a href="{{ attachment.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-paperclip"></i> {{ attachment.file.name|slice:'15:' }}
+                              </a>
+                            {% endif %}
+                          {% endwith %}
+                          <a href="{% url 'delete_trade_attachment' attachment.id %}" class="btn btn-sm btn-danger position-absolute top-0 end-0" style="transform:translate(30%,-30%);" title="Delete attachment"><i class="bi bi-x"></i></a>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
             </div>
-          {% endif %}
-          <button type="submit" class="btn btn-success">Save</button>
-        </form>
+            <div class="d-flex justify-content-between align-items-center mt-4">
+              <button type="submit" class="btn btn-success px-4"><i class="bi bi-check-circle me-1"></i>Save</button>
+              <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Cancel</a>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-    <div class="mt-3">
-      <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
     </div>
   </div>
 </div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+  $('.select2-multi').select2({
+    placeholder: 'Select...',
+    allowClear: true,
+    width: '100%',
+    theme: 'default',
+  });
+  function renderSummary() {
+    // Tags
+    let tags = $('#id_tags').select2('data');
+    let tagsHtml = '';
+    if (tags.length) {
+      tagsHtml = tags.map(t => `<span class="badge bg-primary me-1" data-type="tags" data-id="${t.id}">${t.text}<span class="remove-badge ms-1">&times;</span></span>`).join(' ');
+    }
+    $('#selected-summary-tags').html(tagsHtml);
+    // Positives
+    let positives = $('#id_positives').select2('data');
+    let positivesHtml = '';
+    if (positives.length) {
+      positivesHtml = positives.map(t => `<span class="badge bg-success me-1" data-type="positives" data-id="${t.id}">${t.text}<span class="remove-badge ms-1">&times;</span></span>`).join(' ');
+    }
+    $('#selected-summary-positives').html(positivesHtml);
+    // Negatives
+    let negatives = $('#id_negatives').select2('data');
+    let negativesHtml = '';
+    if (negatives.length) {
+      negativesHtml = negatives.map(t => `<span class="badge bg-danger me-1" data-type="negatives" data-id="${t.id}">${t.text}<span class="remove-badge ms-1">&times;</span></span>`).join(' ');
+    }
+    $('#selected-summary-negatives').html(negativesHtml);
+  }
+  // Remove item when badge cross is clicked
+  $('.selected-multi-summary').on('click', '.remove-badge', function() {
+    let badge = $(this).closest('.badge');
+    let type = badge.data('type');
+    let id = badge.data('id');
+    let select = type === 'tags' ? '#id_tags' : type === 'positives' ? '#id_positives' : '#id_negatives';
+    let values = $(select).val() || [];
+    values = values.filter(v => v != id);
+    $(select).val(values).trigger('change');
+    renderSummary();
+  });
+  $('#id_tags, #id_positives, #id_negatives').on('change', renderSummary);
+  renderSummary();
+});
+</script>
 {% endblock %}

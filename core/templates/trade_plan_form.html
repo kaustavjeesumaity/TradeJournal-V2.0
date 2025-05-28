@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="container my-4 p-4 shadow-lg rounded-4 bg-light-subtle">
+  <h2 class="fw-bold mb-4 text-primary-emphasis">{% if edit %}Edit Trade Plan{% else %}Plan a Trade{% endif %}</h2>
+  <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Instrument</label>
+        {{ form.instrument }}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Planned Entry</label>
+        {{ form.planned_entry }}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Planned Stop</label>
+        {{ form.planned_stop }}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Planned Target</label>
+        {{ form.planned_target }}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Planned Size</label>
+        {{ form.planned_size }}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Checklist Template (optional)</label>
+        {{ form.checklist_template }}
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Custom Checklist Items</label>
+        {{ form.custom_checklist }}
+        <div class="form-text">Comma-separated, e.g. "Check news, Review risk"</div>
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Rationale / Thinking</label>
+        {{ form.rationale }}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Status</label>
+        {{ form.status }}
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Attach Images</label>
+        <input type="file" name="attachments" multiple class="form-control">
+      </div>
+    </div>
+    {% if not edit %}
+    <hr class="my-4">
+    <h5 class="fw-semibold text-secondary mb-3">Initial Psychological Timeline Event (optional)</h5>
+    <div class="row g-3">
+      <div class="col-md-12">
+        <label class="form-label">Description</label>
+        {{ event_form.description }}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Emotion</label>
+        {{ event_form.emotion }}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Confidence (1-10)</label>
+        {{ event_form.confidence }}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Action</label>
+        {{ event_form.action }}
+      </div>
+    </div>
+    {% endif %}
+    <div class="mt-4">
+      <button type="submit" class="btn btn-success rounded-pill px-4">{% if edit %}Save Changes{% else %}Save Plan{% endif %}</button>
+      <a href="{% url 'trade_plan_list' %}" class="btn btn-outline-secondary rounded-pill ms-2">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

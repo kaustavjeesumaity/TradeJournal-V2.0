@@ -1,9 +1,9 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
-from .forms import CustomUserCreationForm, CustomAuthenticationForm, AccountForm, TradeForm, MT5FetchForm
+from .forms import CustomUserCreationForm, CustomAuthenticationForm, AccountForm, TradeForm, MT5FetchForm, TradePlanForm, TradePlanEventForm
 from .forms_profile import ProfileForm
-from .models import Account, Trade, TradeAttachment, Instrument
+from .models import Account, Trade, TradeAttachment, Instrument, DailyChecklistTemplate, DailyChecklistItem, UserDailyChecklistProgress, TradePlan, TradePlanAttachment, TradePlanEvent
 from django.urls import reverse
 from django.db.models import Sum, Count, Q, F, ExpressionWrapper, DecimalField
 from django.utils.dateparse import parse_date
@@ -25,6 +25,9 @@ except ImportError:
 from rest_framework import viewsets, permissions
 from .serializers import AccountSerializer, TradeSerializer
 import datetime
+from django.utils import timezone
+from calendar import monthrange, Calendar
+from datetime import timedelta, date, datetime
 
 def register_view(request):
     if request.method == 'POST':
@@ -59,15 +62,18 @@ def dashboard_view(request):
     trades = Trade.objects.filter(account__user=request.user)
 
     # Filtering
-    instrument = request.GET.get('instrument', '')
+    instrument = request.GET.getlist('instrument')
     outcome = request.GET.get('outcome', '')
     account_number = request.GET.get('account_number', '')
-    start_date = request.GET.get('start_date', datetime.date.today().isoformat())
-    end_date = request.GET.get('end_date', datetime.date.today().isoformat())
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
     sort = request.GET.get('sort', 'exit_date')
 
-    if instrument:
-        trades = trades.filter(instrument=instrument)
+    # Handle 'ALL' for multi-select
+    if instrument and 'ALL' not in instrument:
+        trades = trades.filter(instrument__in=instrument)
+    # If 'ALL' is selected or nothing is selected, do not filter by instrument
+
     if outcome == 'win':
         trades = trades.filter(exit_price__gt=F('entry_price'))
     elif outcome == 'loss':
@@ -77,7 +83,6 @@ def dashboard_view(request):
             account_number_int = int(account_number)
             trades = trades.filter(account__pk=account_number_int)
         except ValueError:
-            # Ignore filter if account_number is not an integer (e.g., legacy or invalid value)
             pass
     if start_date:
         trades = trades.filter(exit_date__date__gte=parse_date(start_date))
@@ -126,7 +131,6 @@ def dashboard_view(request):
         sum([(t.exit_price - t.entry_price) / abs(t.entry_price) for t in trades if t.entry_price != 0]) / total_trades
         if total_trades else 0
     )
-    # PnL trend data for chart
     pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in trades.order_by('exit_date')]
     pnl_values = [float(t.pnl) for t in trades.order_by('exit_date')]
 
@@ -135,15 +139,15 @@ def dashboard_view(request):
     instrument_map = defaultdict(list)
     for t in trades:
         instrument_map[t.instrument].append(t)
-    for instrument, tlist in instrument_map.items():
+    for instrument_name, tlist in instrument_map.items():
         count = len(tlist)
         wins = len([t for t in tlist if t.exit_price > t.entry_price])
         pnl = sum([t.pnl for t in tlist])
-        win_rate = (wins / count * 100) if count else 0
+        win_rate_inst = (wins / count * 100) if count else 0
         instrument_stats.append({
-            'instrument': instrument,
+            'instrument': instrument_name,
             'count': count,
-            'win_rate': win_rate,
+            'win_rate': win_rate_inst,
             'pnl': pnl,
         })
 
@@ -158,19 +162,27 @@ def dashboard_view(request):
         count = len(tlist)
         wins = len([t for t in tlist if t.exit_price > t.entry_price])
         pnl = sum([t.pnl for t in tlist])
-        win_rate = (wins / count * 100) if count else 0
+        win_rate_outcome = (wins / count * 100) if count else 0
         outcome_stats.append({
             'outcome': outcome_label,
             'count': count,
-            'win_rate': win_rate,
+            'win_rate': win_rate_outcome,
             'pnl': pnl,
         })
 
-    # For filter dropdowns
     instrument_list = list(Instrument.objects.values_list('name', flat=True).order_by('name'))
-    # Show all account names in the dropdown, but use account.pk as the value for filtering
     account_options = [(account.pk, account.name) for account in accounts]
     default_account = account_options[0][0] if account_options else ''
+
+    # For filter state in template, always pass a list for instrument
+    filter_dict = {
+        'instrument': instrument,
+        'outcome': outcome,
+        'account_number': account_number,
+        'start_date': start_date,
+        'end_date': end_date,
+        'sort': sort,
+    }
 
     return render(request, 'dashboard.html', {
         'accounts': accounts,
@@ -182,14 +194,7 @@ def dashboard_view(request):
         'avg_risk_reward': avg_risk_reward,
         'pnl_dates': pnl_dates,
         'pnl_values': pnl_values,
-        'filter': {
-            'instrument': instrument,
-            'outcome': outcome,
-            'account_number': account_number,
-            'start_date': start_date,
-            'end_date': end_date,
-            'sort': sort,
-        },
+        'filter': filter_dict,
         'base_currency': base_currency,
         'conversion_rates': conversion_rates,
         'instrument_stats': instrument_stats,
@@ -197,6 +202,125 @@ def dashboard_view(request):
         'instrument_list': instrument_list,
         'account_options': account_options,
         'default_account': default_account,
+    })
+
+@login_required
+def advanced_analytics_view(request):
+    accounts = Account.objects.filter(user=request.user)
+    trades = Trade.objects.filter(account__user=request.user)
+
+    # Filtering (reuse dashboard logic for consistency)
+    instrument = request.GET.getlist('instrument')
+    outcome = request.GET.get('outcome', '')
+    account_number = request.GET.get('account_number', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    sort = request.GET.get('sort', 'exit_date')
+
+    if instrument and 'ALL' not in instrument:
+        trades = trades.filter(instrument__in=instrument)
+    if outcome == 'win':
+        trades = trades.filter(exit_price__gt=F('entry_price'))
+    elif outcome == 'loss':
+        trades = trades.filter(exit_price__lt=F('entry_price'))
+    if account_number:
+        try:
+            account_number_int = int(account_number)
+            trades = trades.filter(account__pk=account_number_int)
+        except ValueError:
+            pass
+    if start_date:
+        trades = trades.filter(exit_date__date__gte=parse_date(start_date))
+    if end_date:
+        trades = trades.filter(exit_date__date__lte=parse_date(end_date))
+    if sort:
+        trades = trades.order_by(sort)
+
+    # PnL over time
+    pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in trades.order_by('exit_date')]
+    pnl_values = [float(t.net_pnl) for t in trades.order_by('exit_date')]
+
+    # Win/Loss ratio
+    win_count = trades.filter(exit_price__gt=F('entry_price')).count()
+    loss_count = trades.filter(exit_price__lt=F('entry_price')).count()
+    win_loss_data = [win_count, loss_count]
+
+    # Avg. holding period by instrument
+    holding_map = defaultdict(list)
+    for t in trades:
+        holding_hours = (t.exit_date - t.entry_date).total_seconds() / 3600.0 if t.exit_date and t.entry_date else 0
+        holding_map[t.instrument].append(holding_hours)
+    holding_labels = list(holding_map.keys())
+    holding_data = [round(sum(v)/len(v), 2) if v else 0 for v in holding_map.values()]
+
+    # Tag performance
+    tag_map = defaultdict(list)
+    for t in trades:
+        if hasattr(t, 'tags'):
+            for tag in t.tags.all():
+                tag_map[str(tag)].append(t.net_pnl)
+    tag_labels = list(tag_map.keys())
+    tag_data = [round(sum(v), 2) for v in tag_map.values()]
+
+    # Session performance
+    session_map = defaultdict(list)
+    for t in trades:
+        session = getattr(t, 'session', None)
+        if session:
+            session_map[str(session)].append(t.net_pnl)  # Use str(session) for JSON serializability
+    session_labels = list(session_map.keys())
+    session_data = [round(sum(v), 2) for v in session_map.values()]
+
+    # Streaks
+    streaks = {'longest_win': 0, 'longest_loss': 0, 'current': 0}
+    current_streak = 0
+    max_win = 0
+    max_loss = 0
+    last_result = None
+    for t in trades.order_by('exit_date'):
+        result = 'win' if t.exit_price > t.entry_price else 'loss' if t.exit_price < t.entry_price else 'break'
+        if result == last_result and result != 'break':
+            current_streak += 1
+        else:
+            current_streak = 1 if result != 'break' else 0
+        if result == 'win':
+            max_win = max(max_win, current_streak)
+        elif result == 'loss':
+            max_loss = max(max_loss, current_streak)
+        last_result = result
+    streaks['longest_win'] = max_win
+    streaks['longest_loss'] = max_loss
+    streaks['current'] = current_streak
+
+    # Best/worst trades
+    best_trade = trades.order_by('-net_pnl').first()
+    worst_trade = trades.order_by('net_pnl').first()
+
+    # Milestones (example: 10th, 50th, 100th trade, or custom logic)
+    milestones = []
+    trade_count = trades.count()
+    for m in [10, 50, 100, 250, 500, 1000]:
+        if trade_count >= m:
+            milestones.append(f"{m} trades completed!")
+    if best_trade:
+        milestones.append(f"Best trade: {best_trade.instrument} ({best_trade.exit_date.strftime('%Y-%m-%d')}) PnL: {best_trade.net_pnl:.2f}")
+    if worst_trade:
+        milestones.append(f"Worst trade: {worst_trade.instrument} ({worst_trade.exit_date.strftime('%Y-%m-%d')}) PnL: {worst_trade.net_pnl:.2f}")
+
+    return render(request, 'advanced_analytics.html', {
+        'pnl_dates': pnl_dates,
+        'pnl_values': pnl_values,
+        'win_loss_data': win_loss_data,
+        'holding_labels': holding_labels,
+        'holding_data': holding_data,
+        'tag_labels': tag_labels,
+        'tag_data': tag_data,
+        'session_labels': session_labels,
+        'session_data': session_data,
+        'streaks': streaks,
+        'best_trade': best_trade,
+        'worst_trade': worst_trade,
+        'milestones': milestones,
     })
 
 @login_required
@@ -234,10 +358,9 @@ def trade_create_view(request):
             if trade.account.user == request.user:
                 trade.save()
                 form.save_m2m()
-                # Handle attachment
-                attachment = form.cleaned_data.get('attachment')
-                if attachment:
-                    TradeAttachment.objects.create(trade=trade, file=attachment)
+                # Handle multiple attachments
+                for f in request.FILES.getlist('attachments'):
+                    TradeAttachment.objects.create(trade=trade, file=f)
                 return redirect('dashboard')
             else:
                 form.add_error('account', 'Invalid account selection.')
@@ -274,7 +397,7 @@ def trade_edit_view(request, pk):
         form.fields['account'].queryset = Account.objects.filter(user=request.user)
         if form.is_valid():
             trade = form.save(commit=False)
-            # Calculate net_pnl if gross_pnl and charges are provided
+            # Calculate net_pnl if gross_pnl and charges are not provided
             gross_pnl = form.cleaned_data.get('gross_pnl')
             charges = form.cleaned_data.get('charges')
             if gross_pnl is not None and charges is not None:
@@ -283,10 +406,9 @@ def trade_edit_view(request, pk):
                 trade.net_pnl = gross_pnl - charges
             trade.save()
             form.save_m2m()
-            # Handle new attachment
-            attachment = form.cleaned_data.get('attachment')
-            if attachment:
-                TradeAttachment.objects.create(trade=trade, file=attachment)
+            # Handle new attachments
+            for f in request.FILES.getlist('attachments'):
+                TradeAttachment.objects.create(trade=trade, file=f)
             return redirect('dashboard')
     else:
         form = TradeForm(instance=trade)
@@ -487,3 +609,325 @@ class TradeViewSet(viewsets.ModelViewSet):
         return Trade.objects.filter(account__user=self.request.user)
     def perform_create(self, serializer):
         serializer.save()
+
+from .models import Trade
+from django.shortcuts import get_object_or_404, render
+
+def trade_detail_view(request, pk):
+    trade = get_object_or_404(Trade, pk=pk)
+    return render(request, 'trade_detail.html', {'trade': trade})
+
+from django.http import HttpResponseForbidden
+
+@login_required
+def delete_trade_attachment(request, attachment_id):
+    attachment = get_object_or_404(TradeAttachment, id=attachment_id)
+    trade = attachment.trade
+    if trade.account.user != request.user:
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        attachment.delete()
+        return redirect('trade_edit', pk=trade.pk)
+    return render(request, 'trade_attachment_confirm_delete.html', {'attachment': attachment, 'trade': trade})
+
+@login_required
+def daily_checklist_view(request):
+    import sys
+    today = timezone.localdate()
+    # Determine which date to show (from GET param or today)
+    date_str = request.GET.get('date')
+    if date_str:
+        try:
+            selected_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+        except Exception:
+            selected_date = today
+    else:
+        selected_date = today
+
+    # Find the latest template effective on or before selected_date
+    template = DailyChecklistTemplate.objects.filter(effective_date__lte=selected_date).order_by('-effective_date').first()
+    items = template.items.all() if template else []
+
+    # For each item, get or create user progress for this date
+    progress_map = {}
+    is_holiday = False
+    if request.user.is_authenticated:
+        for item in items:
+            progress, _ = UserDailyChecklistProgress.objects.get_or_create(
+                user=request.user, item=item, date=selected_date,
+                defaults={'checked': False}
+            )
+            progress_map[item.id] = progress
+        # Check if any progress for this date is marked as holiday
+        if items:
+            is_holiday = UserDailyChecklistProgress.objects.filter(user=request.user, date=selected_date, holiday=True).exists()
+
+    # Admin: handle template editing for future dates only
+    is_admin = request.user.is_staff
+    can_edit = is_admin and selected_date > today
+
+    # Handle user check/uncheck (AJAX or POST)
+    if request.method == 'POST' and not can_edit:
+        # Debug: print POST data and progress_map before saving
+        print(f"[DEBUG] POST data: {request.POST}", file=sys.stderr)
+        print(f"[DEBUG] Progress map before saving:", file=sys.stderr)
+        for k, v in progress_map.items():
+            print(f"  Item {k}: checked={v.checked}", file=sys.stderr)
+        holiday_val = request.POST.get('holiday')
+        is_holiday = holiday_val == 'yes'
+        for item in items:
+            checked = request.POST.get(f'item_{item.id}') == 'on'
+            progress = progress_map[item.id]
+            progress.checked = checked
+            progress.checked_at = timezone.now() if checked else None
+            progress.holiday = is_holiday
+            progress.save()
+        # Debug: print progress_map after saving
+        print(f"[DEBUG] Progress map after saving:", file=sys.stderr)
+        for k, v in progress_map.items():
+            print(f"  Item {k}: checked={v.checked}", file=sys.stderr)
+        return redirect(f'{request.path}?date={selected_date}')
+
+    if is_admin and request.method == 'POST' and can_edit:
+        new_items = request.POST.getlist('admin_item')
+        if new_items:
+            new_template = DailyChecklistTemplate.objects.create(
+                name=f'Admin {request.user.email} {selected_date}',
+                effective_date=selected_date
+            )
+            for idx, text in enumerate(new_items):
+                if text.strip():
+                    DailyChecklistItem.objects.create(template=new_template, text=text, order=idx)
+            return redirect(f'{request.path}?date={selected_date}')
+
+    # After POST and redirect, re-fetch progress_map for GET
+    if request.method == 'GET' and items:
+        pass
+
+    context = {
+        'selected_date': selected_date,
+        'template': template,
+        'items': items,
+        'progress_map': progress_map,
+        'is_admin': is_admin,
+        'can_edit': can_edit,
+        'is_holiday': is_holiday,
+    }
+    return render(request, 'daily_checklist.html', context)
+
+@login_required
+def weekly_checklist_view(request):
+    today = timezone.localdate()
+    date_str = request.GET.get('date')
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            try:
+                selected_date = datetime.strptime(date_str, '%b %d, %Y').date()
+            except Exception:
+                selected_date = today
+    else:
+        selected_date = today
+    # Find the start of the week (Monday)
+    start_of_week = selected_date - timedelta(days=selected_date.weekday())
+    week_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    week = []
+    for i in range(7):
+        day = start_of_week + timedelta(days=i)
+        # Find checklist template for this day
+        template = DailyChecklistTemplate.objects.filter(effective_date__lte=day).order_by('-effective_date').first()
+        items = template.items.all() if template else []
+        if items:
+            progresses = UserDailyChecklistProgress.objects.filter(user=request.user, date=day, item__in=items)
+            checked_count = progresses.filter(checked=True).count()
+            is_holiday = progresses.filter(holiday=True).exists()
+            percent = int(checked_count / items.count() * 100) if items.count() else 0
+            percent = max(0, min(percent, 100))  # Clamp between 0 and 100
+            percent_remaining = 100 - percent
+            circumference = 125.66
+            dashoffset = circumference * (1 - percent / 100)
+            week.append({
+                'date': day,
+                'percent': percent,
+                'percent_remaining': percent_remaining,
+                'dashoffset': dashoffset,
+                'has_checklist': True,
+                'is_holiday': is_holiday,
+                'bg_style': ''
+            })
+        else:
+            week.append({
+                'date': day,
+                'percent': 0,
+                'percent_remaining': 100,
+                'dashoffset': 125.66,
+                'has_checklist': False,
+                'is_holiday': False,
+                'bg_style': 'background: #ffb6c1;'
+            })
+    context = {
+        'selected_date': selected_date,
+        'week_days': week_days,
+        'week': week,
+    }
+    return render(request, 'weekly_checklist.html', context)
+
+@login_required
+def monthly_checklist_view(request):
+    today = timezone.localdate()
+    month_str = request.GET.get('month')
+    if month_str:
+        year, month = map(int, month_str.split('-'))
+        first_day = date(year, month, 1)
+    else:
+        first_day = today.replace(day=1)
+        year, month = first_day.year, first_day.month
+    week_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    cal = Calendar(firstweekday=0)
+    month_grid = []
+    for week in cal.monthdatescalendar(year, month):
+        week_row = []
+        for day in week:
+            if day.month != month:
+                week_row.append(None)
+            else:
+                template = DailyChecklistTemplate.objects.filter(effective_date__lte=day).order_by('-effective_date').first()
+                items = template.items.all() if template else []
+                if items:
+                    progresses = UserDailyChecklistProgress.objects.filter(user=request.user, date=day, item__in=items)
+                    checked_count = progresses.filter(checked=True).count()
+                    is_holiday = progresses.filter(holiday=True).exists()
+                    percent = int(checked_count / items.count() * 100) if items.count() else 0
+                    percent = max(0, min(percent, 100))
+                    percent_remaining = 100 - percent
+                    circumference = 125.66
+                    dashoffset = circumference * (1 - percent / 100)
+                    week_row.append({
+                        'date': day,
+                        'percent': percent,
+                        'percent_remaining': percent_remaining,
+                        'dashoffset': dashoffset,
+                        'has_checklist': True,
+                        'is_holiday': is_holiday,
+                        'bg_style': ''
+                    })
+                else:
+                    week_row.append({
+                        'date': day,
+                        'percent': 0,
+                        'percent_remaining': 100,
+                        'dashoffset': 125.66,
+                        'has_checklist': False,
+                        'is_holiday': False,
+                        'bg_style': 'background: #ffb6c1;'
+                    })
+        month_grid.append(week_row)
+    context = {
+        'selected_month': f"{year:04d}-{month:02d}",
+        'week_days': week_days,
+        'month_grid': month_grid,
+        'today': today,
+    }
+    return render(request, 'monthly_checklist.html', context)
+
+@login_required
+def trade_plan_create_view(request):
+    from .forms import TradePlanEventForm
+    if request.method == 'POST':
+        form = TradePlanForm(request.POST)
+        event_form = TradePlanEventForm(request.POST)
+        files = request.FILES.getlist('attachments')
+        if form.is_valid() and event_form.is_valid():
+            trade_plan = form.save(commit=False)
+            trade_plan.user = request.user
+            trade_plan.save()
+            form.save_m2m()
+            # Save attachments
+            for f in files:
+                TradePlanAttachment.objects.create(trade_plan=trade_plan, image=f)
+            # Save initial event if any description is provided
+            if event_form.cleaned_data.get('description'):
+                event = event_form.save(commit=False)
+                event.trade_plan = trade_plan
+                event.save()
+            return redirect('trade_plan_list')
+    else:
+        form = TradePlanForm()
+        event_form = TradePlanEventForm()
+    return render(request, 'trade_plan_form.html', {'form': form, 'event_form': event_form})
+
+@login_required
+def trade_plan_list_view(request):
+    plans = TradePlan.objects.filter(user=request.user).order_by('-planned_at')
+    status = request.GET.get('status')
+    if status:
+        plans = plans.filter(status=status)
+    return render(request, 'trade_plan_list.html', {'plans': plans, 'status': status})
+
+@login_required
+def trade_plan_detail_view(request, pk):
+    plan = get_object_or_404(TradePlan, pk=pk, user=request.user)
+    return render(request, 'trade_plan_detail.html', {'plan': plan})
+
+@login_required
+def trade_plan_delete_view(request, pk):
+    plan = get_object_or_404(TradePlan, pk=pk, user=request.user)
+    if request.method == 'POST':
+        plan.delete()
+        return redirect('trade_plan_list')
+    return render(request, 'trade_plan_confirm_delete.html', {'plan': plan})
+
+@login_required
+def trade_plan_event_add_view(request, plan_id):
+    plan = get_object_or_404(TradePlan, pk=plan_id, user=request.user)
+    from .forms import TradePlanEventForm
+    if request.method == 'POST':
+        form = TradePlanEventForm(request.POST, request.FILES)
+        if form.is_valid():
+            event = form.save(commit=False)
+            event.trade_plan = plan
+            event.save()
+            return redirect('trade_plan_detail', pk=plan.pk)
+    else:
+        form = TradePlanEventForm()
+    return render(request, 'trade_plan_event_form.html', {'form': form, 'plan': plan})
+
+@login_required
+def trade_plan_event_edit_view(request, event_id):
+    event = get_object_or_404(TradePlanEvent, pk=event_id, trade_plan__user=request.user)
+    plan = event.trade_plan
+    from .forms import TradePlanEventForm
+    if request.method == 'POST':
+        form = TradePlanEventForm(request.POST, request.FILES, instance=event)
+        if form.is_valid():
+            form.save()
+            return redirect('trade_plan_detail', pk=plan.pk)
+    else:
+        form = TradePlanEventForm(instance=event)
+    return render(request, 'trade_plan_event_form.html', {'form': form, 'plan': plan, 'edit': True, 'event': event})
+
+@login_required
+def trade_plan_event_delete_view(request, event_id):
+    event = get_object_or_404(TradePlanEvent, pk=event_id, trade_plan__user=request.user)
+    plan = event.trade_plan
+    if request.method == 'POST':
+        event.delete()
+        return redirect('trade_plan_detail', pk=plan.pk)
+    return render(request, 'trade_plan_event_confirm_delete.html', {'event': event, 'plan': plan})
+
+@login_required
+def trade_plan_edit_view(request, pk):
+    plan = get_object_or_404(TradePlan, pk=pk, user=request.user)
+    if request.method == 'POST':
+        form = TradePlanForm(request.POST, request.FILES, instance=plan)
+        files = request.FILES.getlist('attachments')
+        if form.is_valid():
+            plan = form.save()
+            # Save new attachments
+            for f in files:
+                TradePlanAttachment.objects.create(trade_plan=plan, image=f)
+            return redirect('trade_plan_detail', pk=plan.pk)
+    else:
+        form = TradePlanForm(instance=plan)
+    return render(request, 'trade_plan_form.html', {'form': form, 'edit': True, 'plan': plan})

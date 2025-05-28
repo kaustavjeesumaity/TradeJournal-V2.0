@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4">
+  <h2 class="fw-bold mb-4">Trade Plan Details</h2>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h4 class="card-title">{{ plan.instrument }}</h4>
+      <div class="mb-2"><span class="badge bg-info">{{ plan.get_status_display }}</span></div>
+      <div class="mb-2 text-muted small">Planned: {{ plan.planned_at|date:'Y-m-d H:i' }}</div>
+      <div class="mb-2"><strong>Entry:</strong> {{ plan.planned_entry }} | <strong>Stop:</strong> {{ plan.planned_stop }} | <strong>Target:</strong> {{ plan.planned_target }}</div>
+      <div class="mb-2"><strong>Size:</strong> {{ plan.planned_size }}</div>
+      <div class="mb-2"><strong>Checklist:</strong> {{ plan.checklist_template }}</div>
+      <div class="mb-2"><strong>Custom:</strong> {{ plan.custom_checklist }}</div>
+      <div class="mb-2"><strong>Rationale:</strong> <span class="text-break">{{ plan.rationale }}</span></div>
+      {% if plan.attachments.all %}
+      <div class="mb-2">
+        {% for att in plan.attachments.all %}
+          <img src="{{ att.image.url }}" alt="Attachment" class="img-thumbnail me-1 mb-1" style="max-width: 120px; max-height: 120px;">
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="mb-4">
+        <h5 class="fw-bold">Timeline / Psychological Events</h5>
+        <a href="{% url 'trade_plan_event_add' plan.pk %}" class="btn btn-sm btn-outline-primary rounded-pill mb-2">Add Event</a>
+        {% if plan.events.all %}
+        <ul class="list-group list-group-flush">
+          {% for event in plan.events.all %}
+          <li class="list-group-item">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <span class="badge bg-secondary me-2">{{ event.timestamp|date:'Y-m-d H:i' }}</span>
+                <span class="fw-bold">{{ event.action }}</span>
+                <span class="ms-2 text-muted">Confidence: {{ event.confidence }} / 10</span>
+                <span class="ms-2 text-info">Emotion: {{ event.emotion }}</span>
+              </div>
+              <div>
+                <a href="{% url 'trade_plan_event_edit' event.pk %}" class="btn btn-sm btn-outline-warning rounded-pill me-1">Edit</a>
+                <a href="{% url 'trade_plan_event_delete' event.pk %}" class="btn btn-sm btn-outline-danger rounded-pill">Delete</a>
+              </div>
+            </div>
+            <div class="mt-1">{{ event.description }}
+              {% if event.attachment %}
+                <div class="mt-2">
+                  <a href="{{ event.attachment.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">View Attachment</a>
+                </div>
+              {% endif %}
+            </div>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted">No timeline events recorded yet.</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      <div class="mt-3">
+        <a href="{% url 'trade_plan_list' %}" class="btn btn-outline-secondary rounded-pill">Back to List</a>
+        <a href="{% url 'trade_plan_edit' plan.pk %}" class="btn btn-warning rounded-pill ms-2">Edit</a>
+        <a href="{% url 'trade_plan_delete' plan.pk %}" class="btn btn-danger rounded-pill ms-2">Delete</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

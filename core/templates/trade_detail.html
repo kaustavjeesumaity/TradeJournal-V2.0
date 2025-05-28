@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .card { border-radius: 1rem; box-shadow: 0 2px 16px 0 rgba(0,0,0,0.07); }
+  .card-header { border-top-left-radius: 1rem; border-top-right-radius: 1rem; font-size: 1.1rem; font-weight: 600; }
+  .badge-pnl { font-size: 1em; padding: 0.4em 0.7em; border-radius: 0.5em; font-weight: 500; }
+  .attachment-thumb { max-width: 120px; max-height: 120px; object-fit: cover; border-radius: 0.5em; margin-right: 0.5em; }
+</style>
+<div class="container my-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white d-flex align-items-center">
+          <i class="bi bi-eye me-2"></i> Trade Details
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Instrument</dt>
+            <dd class="col-sm-8">{{ trade.instrument }}</dd>
+            <dt class="col-sm-4">Entry Date</dt>
+            <dd class="col-sm-8">{{ trade.entry_date|date:'Y-m-d H:i' }}</dd>
+            <dt class="col-sm-4">Exit Date</dt>
+            <dd class="col-sm-8">{{ trade.exit_date|date:'Y-m-d H:i' }}</dd>
+            <dt class="col-sm-4">PnL</dt>
+            <dd class="col-sm-8">
+              {% if trade.pnl >= 0 %}
+                <span class="badge badge-pnl bg-success bg-opacity-75 text-white"><i class="bi bi-arrow-up-right me-1"></i>{{ trade.pnl|floatformat:2 }}</span>
+              {% else %}
+                <span class="badge badge-pnl bg-danger bg-opacity-75 text-white"><i class="bi bi-arrow-down-right me-1"></i>{{ trade.pnl|floatformat:2 }}</span>
+              {% endif %}
+            </dd>
+            <dt class="col-sm-4">Tags</dt>
+            <dd class="col-sm-8">{% for tag in trade.tags.all %}{{ tag }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+            <dt class="col-sm-4">Session</dt>
+            <dd class="col-sm-8">{{ trade.session }}</dd>
+            <dt class="col-sm-4">Checklist</dt>
+            <dd class="col-sm-8">{% for item in trade.checklist.all %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+            <dt class="col-sm-4">Positives</dt>
+            <dd class="col-sm-8">{% for pos in trade.positives.all %}{{ pos }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+            <dt class="col-sm-4">Negatives</dt>
+            <dd class="col-sm-8">{% for neg in trade.negatives.all %}{{ neg }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+            <!-- Add more fields as needed -->
+          </dl>
+          {% if trade.attachments.all %}
+          <div class="mt-4">
+            <h6>Attachments</h6>
+            <div class="d-flex flex-wrap gap-2">
+              {% for attachment in trade.attachments.all %}
+                {% with ext=attachment.file.name|lower %}
+                  {% if ext|slice:'-4:' == '.jpg' or ext|slice:'-5:' == '.jpeg' or ext|slice:'-4:' == '.png' or ext|slice:'-4:' == '.gif' %}
+                    <a href="{{ attachment.file.url }}" target="_blank">
+                      <img src="{{ attachment.file.url }}" class="attachment-thumb mb-2" alt="Attachment">
+                    </a>
+                  {% else %}
+                    <a href="{{ attachment.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm mb-2">
+                      <i class="bi bi-paperclip"></i> {{ attachment.file.name|slice:'15:' }}
+                    </a>
+                  {% endif %}
+                {% endwith %}
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          <div class="mt-4 d-flex gap-2">
+            <a href="{% url 'trade_edit' trade.pk %}" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
+            <a href="{% url 'trade_delete' trade.pk %}" class="btn btn-outline-danger"><i class="bi bi-trash"></i> Delete</a>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .card { border-radius: 0.75rem; background: #fff; color: #222; }
+  .card-header { border-radius: 0.75rem 0.75rem 0 0; font-weight: 600; font-size: 1.08em; background: #f8f9fa; color: #222; }
+  .table { border-radius: 0.5rem; overflow: hidden; background: #fff; color: #222; }
+  .form-control, .form-select { border-radius: 0.5rem; background: #fff; color: #222; }
+  .btn { border-radius: 0.5rem; }
+  [data-bs-theme="dark"] .card, [data-bs-theme="dark"] .table, [data-bs-theme="dark"] .form-control, [data-bs-theme="dark"] .form-select {
+    background: #23272b;
+    color: #e9ecef;
+    border-color: #444c56;
+  }
+  [data-bs-theme="dark"] .card-header {
+    background: #181a1b;
+    color: #e9ecef;
+  }
+  [data-bs-theme="dark"] .table {
+    background: #23272b;
+    color: #e9ecef;
+  }
+</style>
+{% endblock %}

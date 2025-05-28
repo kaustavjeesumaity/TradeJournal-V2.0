@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4 p-4 shadow-lg rounded-4 bg-light-subtle">
+  <h2 class="fw-bold mb-4 text-primary-emphasis">Weekly Checklist Progress</h2>
+  <div class="d-flex flex-wrap align-items-center mb-4 gap-2">
+    <form method="get" class="d-flex align-items-center gap-2">
+      <input type="date" name="date" value="{{ selected_date }}" class="form-control form-control-sm rounded-pill border-primary-subtle shadow-sm" style="max-width: 160px;">
+      <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">Go</button>
+    </form>
+    <div class="ms-auto">
+      <a href="{% url 'monthly_checklist' %}?date={{ selected_date }}" class="btn btn-outline-primary btn-sm rounded-pill me-2">Monthly View</a>
+      <a href="{% url 'daily_checklist' %}?date={{ selected_date }}" class="btn btn-outline-secondary btn-sm rounded-pill">Daily View</a>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-bordered text-center align-middle bg-white rounded-3 overflow-hidden shadow-sm" style="table-layout: fixed;">
+      <thead class="table-primary">
+        <tr>
+          {% for day in week_days %}
+            <th class="fw-semibold">{{ day }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          {% for day in week %}
+            {% if day %}
+              {% if day.is_holiday %}
+                <td style="height: 100px; background: #87ceeb;" class="rounded-3">
+                  <div class="fw-bold text-secondary-emphasis">{{ day.date|date:'D, M j' }}</div>
+                  <div class="small mt-2 fw-semibold" style="color: #0a1931; background: #e0f7fa; border-radius: 8px; padding: 4px 0; letter-spacing: 1px;">Holiday</div>
+                </td>
+              {% elif day.has_checklist %}
+                <td style="height: 100px;" class="rounded-3">
+                  <div class="fw-bold text-secondary-emphasis">{{ day.date|date:'D, M j' }}</div>
+                  <div class="d-flex justify-content-center align-items-center my-2">
+                    <div style="width:48px;height:48px;border-radius:50%;background:#f8fafc;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 2px 8px #0001;">
+                      <svg width="48" height="48">
+                        <circle cx="24" cy="24" r="20" fill="#f8fafc" stroke="#dee2e6" stroke-width="2"/>
+                        <circle cx="24" cy="24" r="20" fill="none" stroke="#198754" stroke-width="4" stroke-dasharray="125.66" stroke-dashoffset="{{ day.dashoffset }}" stroke-linecap="round" transform="rotate(-90 24 24)"/>
+                      </svg>
+                      <span style="position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:1.1rem;color:#198754;">{{ day.percent }}%</span>
+                    </div>
+                  </div>
+                </td>
+              {% else %}
+                <td style="height: 100px; background: #ffb6c1;" class="rounded-3">
+                  <div class="fw-bold text-secondary-emphasis">{{ day.date|date:'D, M j' }}</div>
+                  <div class="text-danger small mt-2 fw-semibold">No Checklist</div>
+                </td>
+              {% endif %}
+            {% else %}
+              <td></td>
+            {% endif %}
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

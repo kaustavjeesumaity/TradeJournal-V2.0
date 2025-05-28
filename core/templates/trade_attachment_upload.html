@@ -1,22 +1,43 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Upload Trade Attachment</h2>
-<form method="post" enctype="multipart/form-data">
-  {% csrf_token %}
-  <div class="mb-2">
-    <label for="trade">Trade</label>
-    <select name="trade" class="form-select" required>
-      {% for trade in trades %}
-        <option value="{{ trade.pk }}">{{ trade.instrument }} ({{ trade.entry_date|date:'Y-m-d' }})</option>
-      {% endfor %}
-    </select>
+<style>
+  .card { border-radius: 1rem; box-shadow: 0 2px 16px 0 rgba(0,0,0,0.07); }
+  .card-header { border-top-left-radius: 1rem; border-top-right-radius: 1rem; font-size: 1.1rem; font-weight: 600; }
+  .form-label { font-weight: 500; }
+  .form-control { border-radius: 0.5rem; }
+  .btn { border-radius: 0.5rem; }
+</style>
+<div class="container my-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-header bg-secondary text-white d-flex align-items-center">
+          <i class="bi bi-paperclip me-2"></i> Upload Trade Attachment
+        </div>
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-2">
+              <label for="trade">Trade</label>
+              <select name="trade" class="form-select" required>
+                {% for trade in trades %}
+                  <option value="{{ trade.pk }}">{{ trade.instrument }} ({{ trade.entry_date|date:'Y-m-d' }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-2">
+              <label for="file">Attachment (image/pdf)</label>
+              <input type="file" name="file" class="form-control" accept="image/*,application/pdf" required>
+            </div>
+            <div class="d-flex justify-content-end mt-4">
+              <button type="submit" class="btn btn-success px-4"><i class="bi bi-paperclip me-1"></i>Upload</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="mb-2">
-    <label for="file">Attachment (image/pdf)</label>
-    <input type="file" name="file" class="form-control" accept="image/*,application/pdf" required>
-  </div>
-  <button type="submit" class="btn btn-primary">Upload</button>
-</form>
+</div>
 {% if message %}
   <div class="alert alert-info mt-3">{{ message }}</div>
 {% endif %}

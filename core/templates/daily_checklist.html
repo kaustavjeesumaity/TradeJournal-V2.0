@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block content %}
+<div class="container my-4 p-4 shadow-lg rounded-4 bg-light-subtle">
+  <h2 class="fw-bold mb-4 text-primary-emphasis">Daily Checklist</h2>
+  <div class="d-flex flex-wrap align-items-center mb-4 gap-2">
+    <form method="get" class="d-flex align-items-center gap-2">
+      <input type="date" name="date" value="{{ selected_date }}" class="form-control form-control-sm rounded-pill border-primary-subtle shadow-sm" style="max-width: 160px;">
+      <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">Go</button>
+    </form>
+    <div class="ms-auto">
+      <a href="{% url 'weekly_checklist' %}?date={{ selected_date }}" class="btn btn-outline-primary btn-sm rounded-pill me-2">Weekly View</a>
+      <a href="{% url 'monthly_checklist' %}?date={{ selected_date|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm rounded-pill">Monthly View</a>
+    </div>
+  </div>
+  <div class="card shadow-sm rounded-3 mb-4">
+    <div class="card-body">
+      {% if is_admin and can_edit %}
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Edit Checklist Items for {{ selected_date }}</label>
+            <div id="checklist-items">
+              {% for item in items %}
+                <input type="text" name="admin_item" value="{{ item.text }}" class="form-control mb-2 rounded-pill">
+              {% endfor %}
+              <input type="text" name="admin_item" placeholder="Add new item..." class="form-control mb-2 rounded-pill">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success btn-sm rounded-pill px-3">Save Checklist</button>
+        </form>
+      {% elif items %}
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Checklist for {{ selected_date }}</label>
+            <ul class="list-group list-group-flush mb-3">
+              {% for item in items %}
+                {% with progress=progress_map|get_item:item.id %}
+                <li class="list-group-item d-flex align-items-center">
+                  <input type="checkbox" name="item_{{ item.id }}" class="form-check-input me-2" {% if progress and progress.checked %}checked{% endif %}>
+                  <span class="{% if progress and progress.checked %}text-decoration-line-through text-muted{% endif %}">{{ item.text }}</span>
+                </li>
+                {% endwith %}
+              {% endfor %}
+            </ul>
+            <div class="d-flex align-items-center gap-3 mb-2">
+              <label class="form-label mb-0">Mark as Holiday:</label>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="holiday" id="holiday_yes" value="yes" {% if is_holiday %}checked{% endif %}>
+                <label class="form-check-label" for="holiday_yes">Yes</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="holiday" id="holiday_no" value="no" {% if not is_holiday %}checked{% endif %}>
+                <label class="form-check-label" for="holiday_no">No</label>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success btn-sm rounded-pill px-3">Save Progress</button>
+        </form>
+        {% if is_holiday %}
+          <div class="alert alert-info mt-3 rounded-pill text-center fw-semibold" style="background: #e0f7fa; color: #0a1931;">This day is marked as a <span class="fw-bold">Holiday</span>.</div>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-danger rounded-pill text-center fw-semibold">No checklist available for this day.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -3,6 +3,7 @@ from . import views
 from django.contrib.auth import views as auth_views
 from rest_framework.routers import DefaultRouter
 from .views import AccountViewSet, TradeViewSet
+from .models import Trade
 
 urlpatterns = [
     path('register/', views.register_view, name='register'),
@@ -24,6 +25,12 @@ urlpatterns = [
     path('trades/import/', views.trade_import_csv, name='trade_import_csv'),
     path('tools/position-size/', views.position_size_calculator, name='position_size_calculator'),
     path('trades/fetch-mt5/', views.fetch_mt5_trades, name='fetch_mt5_trades'),
+    path('trades/<int:pk>/', views.trade_detail_view, name='trade_detail'),
+    path('attachments/<int:attachment_id>/delete/', views.delete_trade_attachment, name='delete_trade_attachment'),
+    path('advanced-analytics/', views.advanced_analytics_view, name='advanced_analytics'),
+    path('daily-checklist/', views.daily_checklist_view, name='daily_checklist'),
+    path('weekly-checklist/', views.weekly_checklist_view, name='weekly_checklist'),
+    path('monthly-checklist/', views.monthly_checklist_view, name='monthly_checklist'),
 ]
 
 router = DefaultRouter()
@@ -31,3 +38,16 @@ router.register(r'api/accounts', AccountViewSet, basename='api-accounts')
 router.register(r'api/trades', TradeViewSet, basename='api-trades')
 
 urlpatterns += router.urls
+
+from . import views
+
+urlpatterns += [
+    path('trade-plans/', views.trade_plan_list_view, name='trade_plan_list'),
+    path('trade-plans/new/', views.trade_plan_create_view, name='trade_plan_create'),
+    path('trade-plans/<int:pk>/', views.trade_plan_detail_view, name='trade_plan_detail'),
+    path('trade-plans/<int:pk>/edit/', views.trade_plan_edit_view, name='trade_plan_edit'),
+    path('trade-plans/<int:pk>/delete/', views.trade_plan_delete_view, name='trade_plan_delete'),
+    path('trade-plans/<int:plan_id>/add-event/', views.trade_plan_event_add_view, name='trade_plan_event_add'),
+    path('trade-plans/event/<int:event_id>/edit/', views.trade_plan_event_edit_view, name='trade_plan_event_edit'),
+    path('trade-plans/event/<int:event_id>/delete/', views.trade_plan_event_delete_view, name='trade_plan_event_delete'),
+]
