@@ -172,7 +172,14 @@ class TradePlanEvent(models.Model):
     emotion = models.CharField(max_length=100, blank=True)
     confidence = models.IntegerField(blank=True, null=True, help_text='0-100 scale')
     action = models.CharField(max_length=100, blank=True, help_text='E.g. Observed, Planned, Executed, Dropped')
-    attachment = models.FileField(upload_to='trade_plan_event_attachments/', blank=True, null=True)
 
     def __str__(self):
         return f"{self.trade_plan} @ {self.timestamp:%Y-%m-%d %H:%M} - {self.action}"
+
+class TradePlanEventAttachment(models.Model):
+    event = models.ForeignKey(TradePlanEvent, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='trade_plan_event_attachments/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Attachment for event {self.event_id}"

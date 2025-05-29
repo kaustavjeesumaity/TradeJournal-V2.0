@@ -85,11 +85,12 @@ class TradePlanEventForm(forms.ModelForm):
     ]
     emotion = forms.ChoiceField(choices=EMOTION_CHOICES, required=False, widget=forms.Select(attrs={'class': 'form-select'}))
     action = forms.ChoiceField(choices=ACTION_CHOICES, required=False, widget=forms.Select(attrs={'class': 'form-select'}))
-    confidence = forms.IntegerField(min_value=1, max_value=10, widget=forms.NumberInput(attrs={'class': 'form-range', 'min': 1, 'max': 10}))
-    attachment = forms.FileField(required=False, widget=forms.ClearableFileInput(attrs={'class': 'form-control'}))
+    confidence = forms.IntegerField(min_value=1, max_value=10, required=False, widget=forms.NumberInput(attrs={'class': 'form-range', 'min': 1, 'max': 10}))
+    description = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 2, 'class': 'form-control', 'placeholder': 'Describe what you observed or felt...'}))
+
     class Meta:
         model = TradePlanEvent
-        fields = ['description', 'emotion', 'confidence', 'action', 'attachment']
+        fields = ['description', 'emotion', 'confidence', 'action']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 2, 'class': 'form-control', 'placeholder': 'Describe what you observed or felt...'}),
         }

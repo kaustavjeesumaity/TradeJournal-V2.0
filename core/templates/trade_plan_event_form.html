@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load custom_filters %}
 {% block content %}
 <div class="container my-4">
   <h2 class="fw-bold mb-4">{% if edit %}Edit Timeline Event{% else %}Add Timeline Event to Trade Plan{% endif %}</h2>
@@ -23,11 +24,21 @@
           {{ form.action }}
         </div>
         <div class="mb-3">
-          <label class="form-label">Attachment (optional)</label>
-          {{ form.attachment }}
-          {% if edit and event.attachment %}
+          <label class="form-label">Attachments (optional, multiple allowed)</label>
+          <input type="file" name="attachments" class="form-control" multiple>
+          {% if edit and event.attachments.all %}
             <div class="mt-2">
-              <a href="{{ event.attachment.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">View Current Attachment</a>
+              <div class="row g-2">
+                {% for att in event.attachments.all %}
+                  <div class="col-auto">
+                    <a href="{{ att.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">View</a>
+                    <a href="{% url 'trade_plan_event_attachment_delete' att.pk %}" class="btn btn-outline-danger btn-sm ms-1">Delete</a>
+                    {% if att.file.url|endswith:'.jpg' or att.file.url|endswith:'.jpeg' or att.file.url|endswith:'.png' or att.file.url|endswith:'.gif' %}
+                      <img src="{{ att.file.url }}" alt="Attachment" class="img-thumbnail mt-1" style="max-width: 80px; max-height: 80px;">
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
             </div>
           {% endif %}
         </div>

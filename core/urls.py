@@ -50,4 +50,5 @@ urlpatterns += [
     path('trade-plans/<int:plan_id>/add-event/', views.trade_plan_event_add_view, name='trade_plan_event_add'),
     path('trade-plans/event/<int:event_id>/edit/', views.trade_plan_event_edit_view, name='trade_plan_event_edit'),
     path('trade-plans/event/<int:event_id>/delete/', views.trade_plan_event_delete_view, name='trade_plan_event_delete'),
+    path('trade-plans/event/attachment/<int:attachment_id>/delete/', views.trade_plan_event_attachment_delete_view, name='trade_plan_event_attachment_delete'),
 ]

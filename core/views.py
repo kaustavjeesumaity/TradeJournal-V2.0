@@ -3,7 +3,7 @@ from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
 from .forms import CustomUserCreationForm, CustomAuthenticationForm, AccountForm, TradeForm, MT5FetchForm, TradePlanForm, TradePlanEventForm
 from .forms_profile import ProfileForm
-from .models import Account, Trade, TradeAttachment, Instrument, DailyChecklistTemplate, DailyChecklistItem, UserDailyChecklistProgress, TradePlan, TradePlanAttachment, TradePlanEvent
+from .models import Account, Trade, TradeAttachment, Instrument, DailyChecklistTemplate, DailyChecklistItem, UserDailyChecklistProgress, TradePlan, TradePlanAttachment, TradePlanEvent, TradePlanEventAttachment
 from django.urls import reverse
 from django.db.models import Sum, Count, Q, F, ExpressionWrapper, DecimalField
 from django.utils.dateparse import parse_date
@@ -835,8 +835,8 @@ def monthly_checklist_view(request):
 def trade_plan_create_view(request):
     from .forms import TradePlanEventForm
     if request.method == 'POST':
-        form = TradePlanForm(request.POST)
-        event_form = TradePlanEventForm(request.POST)
+        form = TradePlanForm(request.POST, request.FILES)
+        event_form = TradePlanEventForm(request.POST, request.FILES)
         files = request.FILES.getlist('attachments')
         if form.is_valid() and event_form.is_valid():
             trade_plan = form.save(commit=False)
@@ -884,10 +884,14 @@ def trade_plan_event_add_view(request, plan_id):
     from .forms import TradePlanEventForm
     if request.method == 'POST':
         form = TradePlanEventForm(request.POST, request.FILES)
+        files = request.FILES.getlist('attachments')
         if form.is_valid():
             event = form.save(commit=False)
             event.trade_plan = plan
             event.save()
+            # Save all uploaded files as attachments
+            for f in files:
+                TradePlanEventAttachment.objects.create(event=event, file=f)
             return redirect('trade_plan_detail', pk=plan.pk)
     else:
         form = TradePlanEventForm()
@@ -900,8 +904,12 @@ def trade_plan_event_edit_view(request, event_id):
     from .forms import TradePlanEventForm
     if request.method == 'POST':
         form = TradePlanEventForm(request.POST, request.FILES, instance=event)
+        files = request.FILES.getlist('attachments')
         if form.is_valid():
             form.save()
+            # Save new uploaded files as attachments
+            for f in files:
+                TradePlanEventAttachment.objects.create(event=event, file=f)
             return redirect('trade_plan_detail', pk=plan.pk)
     else:
         form = TradePlanEventForm(instance=event)
@@ -931,3 +939,13 @@ def trade_plan_edit_view(request, pk):
     else:
         form = TradePlanForm(instance=plan)
     return render(request, 'trade_plan_form.html', {'form': form, 'edit': True, 'plan': plan})
+
+@login_required
+def trade_plan_event_attachment_delete_view(request, attachment_id):
+    att = get_object_or_404(TradePlanEventAttachment, pk=attachment_id, event__trade_plan__user=request.user)
+    event = att.event
+    plan = event.trade_plan
+    if request.method == 'POST':
+        att.delete()
+        return redirect('trade_plan_event_edit', event_id=event.pk)
+    return render(request, 'trade_attachment_confirm_delete.html', {'attachment': att, 'event': event, 'plan': plan, 'is_event_attachment': True})
