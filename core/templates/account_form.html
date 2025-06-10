@@ -13,9 +13,8 @@
       <div class="card shadow-sm">
         <div class="card-header bg-primary text-white d-flex align-items-center">
           <i class="bi bi-person-plus me-2"></i> {% if account %}Edit Account{% else %}Add Account{% endif %}
-        </div>
-        <div class="card-body">
-          <form method="post">
+        </div>        <div class="card-body">
+          <form method="post" id="accountForm">
             {% csrf_token %}
             {% for field in form %}
               <div class="mb-3">
@@ -47,5 +46,40 @@
     background: #181a1b;
     color: #e9ecef;
   }
+  .manual-field {
+    transition: opacity 0.3s ease;
+  }
+  .manual-field.hidden {
+    opacity: 0.5;
+    pointer-events: none;
+  }
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const accountSourceRadios = document.querySelectorAll('input[name="account_source"]');
+    const manualFields = document.querySelectorAll('.manual-field');
+    
+    function toggleFields() {
+        const selectedSource = document.querySelector('input[name="account_source"]:checked');
+        if (selectedSource) {
+            if (selectedSource.value === 'mt5') {
+                manualFields.forEach(field => {
+                    field.closest('.mb-3').style.display = 'none';
+                });
+            } else {
+                manualFields.forEach(field => {
+                    field.closest('.mb-3').style.display = 'block';
+                });
+            }
+        }
+    }
+    
+    accountSourceRadios.forEach(radio => {
+        radio.addEventListener('change', toggleFields);
+    });
+    
+    // Initial toggle
+    toggleFields();
+});
+</script>
 {% endblock %}

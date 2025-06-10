@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Achievements</h2>
+  <a href="{% url 'achievement_create' %}" class="btn btn-success mb-3">Add Achievement</a>
+  <table class="table table-dark table-striped">
+    <thead><tr><th>Name</th><th>Description</th><th>Date</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for achievement in achievements %}
+      <tr>
+        <td>{{ achievement.name }}</td>
+        <td>{{ achievement.description|truncatechars:60 }}</td>
+        <td>{{ achievement.achieved_at|date:'Y-m-d' }}</td>
+        <td>
+          <a href="{% url 'achievement_edit' achievement.pk %}" class="btn btn-sm btn-primary">Edit</a>
+          <a href="{% url 'achievement_delete' achievement.pk %}" class="btn btn-sm btn-danger">Delete</a>
+        </td>
+      </tr>
+      {% empty %}<tr><td colspan="4">No achievements found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

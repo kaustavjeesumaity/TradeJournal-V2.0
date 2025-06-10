@@ -91,12 +91,26 @@
                 <div class="mb-3">{{ form.exit_price.label_tag }}{{ form.exit_price }}</div>
                 <div class="mb-3">{{ form.entry_date.label_tag }}{{ form.entry_date }}</div>
                 <div class="mb-3">{{ form.exit_date.label_tag }}{{ form.exit_date }}</div>
-                <div class="mb-3">{{ form.quantity.label_tag }}{{ form.quantity }}</div>
+                <div class="mb-3">{{ form.size.label_tag }}{{ form.size }}</div>
                 <div class="mb-3">{{ form.notes.label_tag }}{{ form.notes }}</div>
                 <div class="mb-3">{{ form.gross_pnl.label_tag }}{{ form.gross_pnl }}</div>
                 <div class="mb-3">{{ form.charges.label_tag }}{{ form.charges }}</div>
                 <div class="mb-3">{{ form.session.label_tag }}<div>{{ form.session }}</div></div>
-                <div class="mb-3">{{ form.checklist.label_tag }}<div>{{ form.checklist }}</div></div>
+                <div class="mb-3">{{ form.checklist.label_tag }}<div>{{ form.checklist }}</div></div>                <div class="mb-3">{{ form.asset_class.label_tag }}{{ form.asset_class }}</div>
+                <div class="mb-3">{{ form.direction.label_tag }}{{ form.direction }}</div>
+                <div class="mb-3">{{ form.status.label_tag }}{{ form.status }}</div>
+                <div class="mb-3">{{ form.stop_loss.label_tag }}{{ form.stop_loss }}</div>
+                <div class="mb-3">{{ form.take_profit.label_tag }}{{ form.take_profit }}</div>
+                <div class="mb-3">{{ form.risk_per_trade.label_tag }}{{ form.risk_per_trade }}</div>
+                <div class="mb-3">{{ form.fees.label_tag }}{{ form.fees }}</div>
+                <div class="mb-3">{{ form.slippage.label_tag }}{{ form.slippage }}</div>
+                <div class="mb-3">{{ form.r_multiple.label_tag }}{{ form.r_multiple }}</div>
+                <div class="mb-3">{{ form.order_type.label_tag }}{{ form.order_type }}</div>
+                <div class="mb-3">{{ form.outcome.label_tag }}{{ form.outcome }}</div>
+                <div class="mb-3">{{ form.psychological_state.label_tag }}{{ form.psychological_state }}</div>
+                <div class="mb-3">{{ form.journal_notes.label_tag }}{{ form.journal_notes }}</div>
+                <div class="mb-3">{{ form.lessons_learned.label_tag }}{{ form.lessons_learned }}</div>
+                <div class="mb-3">{{ form.planned_trade.label_tag }}{{ form.planned_trade }}</div>
               </div>
               <div class="col-md-6">
                 <div class="mb-3">
@@ -125,9 +139,8 @@
                     {% endfor %}
                   </select>
                   <div class="selected-multi-summary" id="selected-summary-negatives"></div>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">{{ form.attachment.label }}</label>
+                </div>                <div class="mb-3">
+                  <label class="form-label">Attachments</label>
                   <input type="file" name="attachments" id="id_attachments" class="form-control" multiple>
                   {% if trade and trade.attachments.all %}
                   <div class="mt-2">

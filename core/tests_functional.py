@@ -12,9 +12,7 @@ class TradingJournalFunctionalTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(username='testuser', email='testuser@example.com', password='testpass123')
         self.account = self.user.accounts.create(name='TestAcc', balance=1000, currency='USD')
-        self.client.login(username='testuser@example.com', password='testpass123')
-
-    def test_add_trade(self):
+        self.client.login(username='testuser@example.com', password='testpass123')    def test_add_trade(self):
         url = reverse('trade_create')
         data = {
             'account': self.account.pk,
@@ -23,7 +21,7 @@ class TradingJournalFunctionalTests(TestCase):
             'exit_price': 110,
             'entry_date': '2025-05-28 10:00',
             'exit_date': '2025-05-28 15:00',
-            'quantity': 10,
+            'size': 10,
             'notes': 'Test trade',
         }
         response = self.client.post(url, data)

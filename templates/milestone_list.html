@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">Milestones</h2>
+  <a href="{% url 'milestone_create' %}" class="btn btn-primary mb-3">Add Milestone</a>
+  {% if milestones %}
+    <ul class="list-group">
+      {% for milestone in milestones %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ milestone.description }}</span>
+          <span class="badge bg-secondary">{{ milestone.achieved_at|date:'Y-m-d' }}</span>
+          <a href="{% url 'milestone_edit' milestone.pk %}" class="btn btn-sm btn-outline-primary ms-2">Edit</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No milestones found.</p>
+  {% endif %}
+</div>
+{% endblock %}

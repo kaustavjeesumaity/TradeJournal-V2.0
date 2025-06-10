@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">Reviews</h2>
+  <a href="{% url 'review_create' %}" class="btn btn-primary mb-3">Add Review</a>
+  {% if reviews %}
+    <ul class="list-group">
+      {% for review in reviews %}
+        <li class="list-group-item d-flex align-items-center" style="min-height:3rem;">
+          <div class="flex-grow-1">
+            <div class="fw-bold">{{ review.period }}</div>
+            {% if review.summary %}
+              <div class="small text-muted">{{ review.summary }}</div>
+            {% endif %}
+          </div>
+          <span class="badge bg-secondary ms-2">{{ review.date|date:'Y-m-d' }}</span>
+          <a href="{% url 'review_edit' review.pk %}" class="btn btn-sm btn-outline-primary ms-2">Edit</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No reviews found.</p>
+  {% endif %}
+</div>
+<style>
+  [data-bs-theme="dark"] .list-group-item {
+    color: #f8f9fa;
+    background-color: #23272b;
+  }
+</style>
+{% endblock %}

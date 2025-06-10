@@ -12,34 +12,185 @@
       <div class="card shadow-sm">
         <div class="card-header bg-dark text-white d-flex align-items-center">
           <i class="bi bi-eye me-2"></i> Trade Details
-        </div>
-        <div class="card-body">
+        </div>        <div class="card-body">
           <dl class="row mb-0">
             <dt class="col-sm-4">Instrument</dt>
             <dd class="col-sm-8">{{ trade.instrument }}</dd>
-            <dt class="col-sm-4">Entry Date</dt>
-            <dd class="col-sm-8">{{ trade.entry_date|date:'Y-m-d H:i' }}</dd>
-            <dt class="col-sm-4">Exit Date</dt>
-            <dd class="col-sm-8">{{ trade.exit_date|date:'Y-m-d H:i' }}</dd>
-            <dt class="col-sm-4">PnL</dt>
+            
+            {% if trade.asset_class %}
+            <dt class="col-sm-4">Asset Class</dt>
+            <dd class="col-sm-8">{{ trade.asset_class }}</dd>
+            {% endif %}
+            
+            {% if trade.direction %}
+            <dt class="col-sm-4">Direction</dt>
             <dd class="col-sm-8">
-              {% if trade.pnl >= 0 %}
-                <span class="badge badge-pnl bg-success bg-opacity-75 text-white"><i class="bi bi-arrow-up-right me-1"></i>{{ trade.pnl|floatformat:2 }}</span>
+              {% if trade.direction == 'long' %}
+                <span class="badge bg-success"><i class="bi bi-arrow-up"></i> Long</span>
               {% else %}
-                <span class="badge badge-pnl bg-danger bg-opacity-75 text-white"><i class="bi bi-arrow-down-right me-1"></i>{{ trade.pnl|floatformat:2 }}</span>
+                <span class="badge bg-danger"><i class="bi bi-arrow-down"></i> Short</span>
               {% endif %}
             </dd>
+            {% endif %}
+            
+            <dt class="col-sm-4">Status</dt>
+            <dd class="col-sm-8">
+              {% if trade.status == 'open' %}
+                <span class="badge bg-warning text-dark">Open</span>
+              {% else %}
+                <span class="badge bg-secondary">Closed</span>
+              {% endif %}
+            </dd>
+            
+            <dt class="col-sm-4">Entry Price</dt>
+            <dd class="col-sm-8">{{ trade.entry_price|floatformat:4 }}</dd>
+            
+            {% if trade.exit_price %}
+            <dt class="col-sm-4">Exit Price</dt>
+            <dd class="col-sm-8">{{ trade.exit_price|floatformat:4 }}</dd>
+            {% endif %}
+            
+            <dt class="col-sm-4">Entry Date</dt>
+            <dd class="col-sm-8">{{ trade.entry_date|date:'Y-m-d H:i' }}</dd>
+            
+            {% if trade.exit_date %}
+            <dt class="col-sm-4">Exit Date</dt>
+            <dd class="col-sm-8">{{ trade.exit_date|date:'Y-m-d H:i' }}</dd>
+            {% endif %}
+            
+            {% if trade.size %}
+            <dt class="col-sm-4">Size</dt>
+            <dd class="col-sm-8">{{ trade.size|floatformat:2 }}</dd>
+            {% endif %}
+            
+            {% if trade.stop_loss %}
+            <dt class="col-sm-4">Stop Loss</dt>
+            <dd class="col-sm-8">{{ trade.stop_loss|floatformat:4 }}</dd>
+            {% endif %}
+            
+            {% if trade.take_profit %}
+            <dt class="col-sm-4">Take Profit</dt>
+            <dd class="col-sm-8">{{ trade.take_profit|floatformat:4 }}</dd>
+            {% endif %}
+            
+            {% if trade.risk_per_trade %}
+            <dt class="col-sm-4">Risk per Trade</dt>
+            <dd class="col-sm-8">{{ trade.risk_per_trade|floatformat:2 }}</dd>
+            {% endif %}
+            
+            {% if trade.fees %}
+            <dt class="col-sm-4">Fees</dt>
+            <dd class="col-sm-8">{{ trade.fees|floatformat:2 }}</dd>
+            {% endif %}
+            
+            {% if trade.slippage %}
+            <dt class="col-sm-4">Slippage</dt>
+            <dd class="col-sm-8">{{ trade.slippage|floatformat:2 }}</dd>
+            {% endif %}
+            
+            {% if trade.r_multiple %}
+            <dt class="col-sm-4">R Multiple</dt>
+            <dd class="col-sm-8">{{ trade.r_multiple|floatformat:2 }}R</dd>
+            {% endif %}
+            
+            {% if trade.order_type %}
+            <dt class="col-sm-4">Order Type</dt>
+            <dd class="col-sm-8">{{ trade.order_type }}</dd>
+            {% endif %}
+            
+            {% if trade.outcome %}
+            <dt class="col-sm-4">Outcome</dt>
+            <dd class="col-sm-8">{{ trade.outcome }}</dd>
+            {% endif %}
+            
+            {% if trade.psychological_state %}
+            <dt class="col-sm-4">Psychological State</dt>
+            <dd class="col-sm-8">{{ trade.psychological_state }}</dd>
+            {% endif %}
+            
+            <dt class="col-sm-4">Gross P&L</dt>
+            <dd class="col-sm-8">
+              {% if trade.gross_pnl >= 0 %}
+                <span class="badge badge-pnl bg-success bg-opacity-75 text-white"><i class="bi bi-arrow-up-right me-1"></i>{{ trade.gross_pnl|floatformat:2 }}</span>
+              {% else %}
+                <span class="badge badge-pnl bg-danger bg-opacity-75 text-white"><i class="bi bi-arrow-down-right me-1"></i>{{ trade.gross_pnl|floatformat:2 }}</span>
+              {% endif %}
+            </dd>
+            
+            <dt class="col-sm-4">Charges</dt>
+            <dd class="col-sm-8">{{ trade.charges|floatformat:2 }}</dd>
+            
+            <dt class="col-sm-4">Net P&L</dt>
+            <dd class="col-sm-8">
+              {% if trade.net_pnl >= 0 %}
+                <span class="badge badge-pnl bg-success bg-opacity-75 text-white"><i class="bi bi-arrow-up-right me-1"></i>{{ trade.net_pnl|floatformat:2 }}</span>
+              {% else %}
+                <span class="badge badge-pnl bg-danger bg-opacity-75 text-white"><i class="bi bi-arrow-down-right me-1"></i>{{ trade.net_pnl|floatformat:2 }}</span>
+              {% endif %}
+            </dd>
+            
+            {% if trade.tags.all %}
             <dt class="col-sm-4">Tags</dt>
-            <dd class="col-sm-8">{% for tag in trade.tags.all %}{{ tag }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+            <dd class="col-sm-8">
+              {% for tag in trade.tags.all %}
+                <span class="badge bg-primary me-1">{{ tag }}</span>
+              {% endfor %}
+            </dd>
+            {% endif %}
+            
+            {% if trade.session %}
             <dt class="col-sm-4">Session</dt>
             <dd class="col-sm-8">{{ trade.session }}</dd>
+            {% endif %}
+            
+            {% if trade.checklist.all %}
             <dt class="col-sm-4">Checklist</dt>
-            <dd class="col-sm-8">{% for item in trade.checklist.all %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+            <dd class="col-sm-8">
+              {% for item in trade.checklist.all %}
+                <span class="badge bg-info me-1"><i class="bi bi-check"></i> {{ item }}</span>
+              {% endfor %}
+            </dd>
+            {% endif %}
+            
+            {% if trade.positives.all %}
             <dt class="col-sm-4">Positives</dt>
-            <dd class="col-sm-8">{% for pos in trade.positives.all %}{{ pos }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+            <dd class="col-sm-8">
+              {% for pos in trade.positives.all %}
+                <span class="badge bg-success me-1"><i class="bi bi-plus"></i> {{ pos }}</span>
+              {% endfor %}
+            </dd>
+            {% endif %}
+            
+            {% if trade.negatives.all %}
             <dt class="col-sm-4">Negatives</dt>
-            <dd class="col-sm-8">{% for neg in trade.negatives.all %}{{ neg }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
-            <!-- Add more fields as needed -->
+            <dd class="col-sm-8">
+              {% for neg in trade.negatives.all %}
+                <span class="badge bg-warning text-dark me-1"><i class="bi bi-dash"></i> {{ neg }}</span>
+              {% endfor %}
+            </dd>
+            {% endif %}
+            
+            {% if trade.notes %}
+            <dt class="col-sm-4">Notes</dt>
+            <dd class="col-sm-8">{{ trade.notes|linebreaksbr }}</dd>
+            {% endif %}
+            
+            {% if trade.journal_notes %}
+            <dt class="col-sm-4">Journal Notes</dt>
+            <dd class="col-sm-8">{{ trade.journal_notes|linebreaksbr }}</dd>
+            {% endif %}
+            
+            {% if trade.lessons_learned %}
+            <dt class="col-sm-4">Lessons Learned</dt>
+            <dd class="col-sm-8">{{ trade.lessons_learned|linebreaksbr }}</dd>
+            {% endif %}
+            
+            {% if trade.planned_trade %}
+            <dt class="col-sm-4">Planned Trade</dt>
+            <dd class="col-sm-8">
+              <a href="{% url 'trade_plan_detail' trade.planned_trade.pk %}" class="text-decoration-none">{{ trade.planned_trade }}</a>
+            </dd>
+            {% endif %}
           </dl>
           {% if trade.attachments.all %}
           <div class="mt-4">

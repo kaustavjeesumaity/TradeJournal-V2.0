@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Books</h2>
+  <a href="{% url 'book_create' %}" class="btn btn-success mb-3">Add Book</a>
+  <table class="table table-dark table-striped">
+    <thead><tr><th>Title</th><th>Author</th><th>Completed</th><th>Completion Date</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for book in books %}
+      <tr>
+        <td>{{ book.title }}</td>
+        <td>{{ book.author }}</td>
+        <td>{{ book.completed|yesno:"Yes,No" }}</td>
+        <td>{{ book.completion_date }}</td>
+        <td>
+          <a href="{% url 'book_edit' book.pk %}" class="btn btn-sm btn-primary">Edit</a>
+          <a href="{% url 'book_delete' book.pk %}" class="btn btn-sm btn-danger">Delete</a>
+        </td>
+      </tr>
+      {% empty %}<tr><td colspan="5">No books found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

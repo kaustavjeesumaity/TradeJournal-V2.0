@@ -15,14 +15,44 @@
     .btn { border-radius: 0.5rem; }
     .table { border-radius: 0.5rem; overflow: hidden; }
     /* Dark mode customizations */
-    [data-bs-theme="dark"] body {
-      background: #181a1b;
-      color: #e9ecef;
-    }
-    [data-bs-theme="dark"] .card {
-      background: #23272b;
-      color: #e9ecef;
-    }
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1E1E1E;
+            --text-primary: #E0E0E0;
+            --accent: #BB86FC;
+            --accent-hover: #3700B3;
+            --border: #383838;
+        }
+
+        [data-bs-theme="dark"] {
+            --bs-body-bg: var(--bg-primary);
+            --bs-body-color: var(--text-primary);
+            --bs-card-bg: var(--bg-secondary);
+            --bs-table-bg: var(--bg-secondary);
+            --bs-border-color: var(--border);
+        }
+
+        [data-bs-theme="dark"] .card {
+            background: var(--bg-secondary);
+            border-color: var(--border);
+        }
+
+        [data-bs-theme="dark"] .table {
+            --bs-table-striped-bg: #{rgba(255,255,255,0.05)};
+            --bs-table-hover-bg: #{rgba(255,255,255,0.08)};
+        }
+
+        [data-bs-theme="dark"] .btn-outline-primary {
+            --bs-btn-color: var(--accent);
+            --bs-btn-border-color: var(--accent);
+            --bs-btn-hover-bg: var(--accent);
+            --bs-btn-hover-border-color: var(--accent);
+        }
+
+        [data-bs-theme="dark"] .alert-info {
+            --bs-alert-bg: #{rgba(187,134,252,0.15)};
+            --bs-alert-border-color: #{rgba(187,134,252,0.3)};
+        }
     [data-bs-theme="dark"] .navbar, [data-bs-theme="dark"] .navbar-brand {
       background: #181a1b !important;
       color: #e9ecef !important;
@@ -68,23 +98,152 @@
     body[data-bs-theme="dark"] .table thead th {
       background-color: #23272b !important;
       color: #f8f9fa;
-    }
-    body[data-bs-theme="dark"] .btn-outline-secondary,
+    }    body[data-bs-theme="dark"] .btn-outline-secondary,
     body[data-bs-theme="dark"] .btn-outline-primary,
     body[data-bs-theme="dark"] .btn-outline-danger {
-      color: #f8f9fa;
+      color: #f8f9fa !important;
       border-color: #6c757d;
+      background-color: transparent;
     }
     body[data-bs-theme="dark"] .btn-outline-secondary:hover,
     body[data-bs-theme="dark"] .btn-outline-primary:hover,
     body[data-bs-theme="dark"] .btn-outline-danger:hover {
-      background: #23272b;
-      color: #fff;
+      background: #6c757d !important;
+      color: #fff !important;
+      border-color: #6c757d;
+    }
+    
+    /* Dark mode link colors */
+    [data-bs-theme="dark"] a {
+      color: #66b3ff !important;
+    }
+    [data-bs-theme="dark"] a:hover {
+      color: #4da6ff !important;
+    }
+    [data-bs-theme="dark"] .nav-link {
+      color: #f8f9fa !important;
+    }
+    [data-bs-theme="dark"] .nav-link:hover {
+      color: #66b3ff !important;
+    }
+    [data-bs-theme="dark"] .dropdown-item {
+      color: #f8f9fa !important;
+      background-color: #23272b;
+    }
+    [data-bs-theme="dark"] .dropdown-item:hover {
+      color: #fff !important;
+      background-color: #343a40 !important;
+    }
+    [data-bs-theme="dark"] .dropdown-menu {
+      background-color: #23272b !important;
+      border-color: #444c56;
+    }
+    
+    /* Fix button text visibility */
+    [data-bs-theme="dark"] .btn {
+      color: #f8f9fa !important;
+    }
+    [data-bs-theme="dark"] .btn-primary {
+      background-color: #0d6efd !important;
+      border-color: #0d6efd !important;
+      color: #fff !important;
+    }
+    [data-bs-theme="dark"] .btn-secondary {
+      background-color: #6c757d !important;
+      border-color: #6c757d !important;
+      color: #fff !important;
+    }
+    [data-bs-theme="dark"] .btn-success {
+      background-color: #198754 !important;
+      border-color: #198754 !important;
+      color: #fff !important;
+    }
+    [data-bs-theme="dark"] .btn-danger {
+      background-color: #dc3545 !important;
+      border-color: #dc3545 !important;
+      color: #fff !important;
+    }
+    [data-bs-theme="dark"] .btn-warning {
+      background-color: #fd7e14 !important;
+      border-color: #fd7e14 !important;
+      color: #000 !important;
+    }
+    [data-bs-theme="dark"] .btn-info {
+      background-color: #0dcaf0 !important;
+      border-color: #0dcaf0 !important;
+      color: #000 !important;
+    }
+      /* Fix navbar in dark mode */
+    [data-bs-theme="dark"] .navbar {
+      background-color: #23272b !important;
+    }
+    [data-bs-theme="dark"] .navbar-brand {
+      color: #f8f9fa !important;
+    }
+    [data-bs-theme="dark"] .navbar-toggler {
+      border-color: #6c757d;
+    }
+    [data-bs-theme="dark"] .navbar-toggler-icon {
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28248, 249, 250, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+    }
+    
+    /* Navbar links styling */
+    .navbar-nav .nav-link {
+      color: #000 !important;
+      transition: color 0.2s ease;
+    }
+    .navbar-nav .nav-link:hover {
+      color: #0d6efd !important;
+    }
+    [data-bs-theme="dark"] .navbar-nav .nav-link {
+      color: #f8f9fa !important;
+    }
+    [data-bs-theme="dark"] .navbar-nav .nav-link:hover {
+      color: #66b3ff !important;
+    }
+      /* Enhanced dropdown styling and functionality */
+    .dropdown-menu {
+      z-index: 1050 !important;
+      min-width: 200px;
+      border-radius: 0.5rem;
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    [data-bs-theme="dark"] .dropdown-menu {
+      background-color: #23272b !important;
+      border-color: #495057 !important;
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5) !important;
+    }
+    .dropdown-item {
+      padding: 0.5rem 1rem;
+      transition: background-color 0.2s ease;
+    }
+    [data-bs-theme="dark"] .dropdown-item {
+      color: #f8f9fa !important;
+    }
+    [data-bs-theme="dark"] .dropdown-item:hover,
+    [data-bs-theme="dark"] .dropdown-item:focus {
+      background-color: #495057 !important;
+      color: #fff !important;
+    }
+    [data-bs-theme="dark"] .dropdown-divider {
+      border-color: #495057 !important;
+    }
+    [data-bs-theme="dark"] .dropdown-item-text {
+      color: #6c757d !important;
+    }
+    .dropdown-toggle::after {
+      margin-left: 0.5em;
     }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
 <body data-bs-theme="light">
+<script>
+  // Set theme immediately to prevent flash
+  const initialTheme = localStorage.getItem('theme') || 'light';
+  document.body.setAttribute('data-bs-theme', initialTheme);
+  document.documentElement.setAttribute('data-bs-theme', initialTheme);
+</script>
 <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm mb-4">
   <div class="container-fluid">
     <a class="navbar-brand fw-bold" href="{% url 'dashboard' %}"><i class="bi bi-bar-chart-line"></i> Trade Journal</a>
@@ -96,6 +255,24 @@
         {% if user.is_authenticated %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-house"></i> Dashboard</a>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="accountDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-wallet2"></i> 
+            {% if selected_account %}{{ selected_account.name }}{% else %}Select Account{% endif %}
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="accountDropdown">
+            {% for account in user.accounts.all %}
+              <li><a class="dropdown-item" href="?account={{ account.id }}">{{ account.name }} ({{ account.currency }})</a></li>
+            {% empty %}
+              <li><span class="dropdown-item-text text-muted">No accounts yet</span></li>
+            {% endfor %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'account_create' %}"><i class="bi bi-plus-circle"></i> Add Account</a></li>
+            {% if selected_account and selected_account.mt5_account_number %}
+              <li><a class="dropdown-item" href="{% url 'fetch_mt5_trades' %}"><i class="bi bi-arrow-clockwise"></i> Refresh MT5</a></li>
+            {% endif %}
+          </ul>
         </li>
         <li class="nav-item">
           <a class="nav-link" href="{% url 'advanced_analytics' %}"><i class="bi bi-bar-chart-line"></i> Advanced Analytics</a>
@@ -136,18 +313,52 @@
   {% block content %}{% endblock %}
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-  // Dark mode toggle
+<script>  // Dark mode toggle with localStorage persistence
   const themeToggle = document.getElementById('themeToggle');
   const body = document.body;
+  const html = document.documentElement;
+  
+  // Load saved theme or default to light
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  body.setAttribute('data-bs-theme', savedTheme);
+  html.setAttribute('data-bs-theme', savedTheme);
+  
+  // Set initial button icon
+  if (savedTheme === 'dark') {
+    themeToggle.innerHTML = '<i class="bi bi-sun"></i>';
+  } else {
+    themeToggle.innerHTML = '<i class="bi bi-moon"></i>';
+  }
+  
   themeToggle.addEventListener('click', function() {
     if (body.getAttribute('data-bs-theme') === 'dark') {
       body.setAttribute('data-bs-theme', 'light');
+      html.setAttribute('data-bs-theme', 'light');
       themeToggle.innerHTML = '<i class="bi bi-moon"></i>';
+      localStorage.setItem('theme', 'light');
     } else {
       body.setAttribute('data-bs-theme', 'dark');
+      html.setAttribute('data-bs-theme', 'dark');
       themeToggle.innerHTML = '<i class="bi bi-sun"></i>';
+      localStorage.setItem('theme', 'dark');
     }
+  });
+    // Simple dropdown debugging - let Bootstrap handle everything automatically
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded - Bootstrap should auto-initialize dropdowns');
+    
+    // Log dropdowns found
+    const dropdowns = document.querySelectorAll('.dropdown-toggle');
+    console.log('Found', dropdowns.length, 'dropdown toggle(s)');
+    
+    // Log when dropdowns are shown/hidden for debugging
+    document.addEventListener('shown.bs.dropdown', function(e) {
+      console.log('Dropdown shown:', e.target.id || e.target.className);
+    });
+    
+    document.addEventListener('hidden.bs.dropdown', function(e) {
+      console.log('Dropdown hidden:', e.target.id || e.target.className);
+    });
   });
 </script>
 {% block extra_js %}{% endblock %}

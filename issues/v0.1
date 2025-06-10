@@ -1,0 +1,7 @@
+1. Profile section is twice visible in the Dashboard, one in the top and another in below that. No need to have it twice.
+2. The Account model is not sync up with template forms
+3. Modify the current way of account addition for MT5. The experience would be like this,
+    i. User clicks add account. They will have the option to login with MT5.
+    ii. They will provide all the necessary information, after they hit create account the trades will be fetched.
+4. There will be no more account section in the Dashboard. Instead the user can select an account from the dropdown menu which will be carried over through out the journey. if an mt5 account is selected then they will have a refresh button, on clicking this, the user will be asked for the password. once correct password is given it will authenticate fetch the trades after the last timestamp. Note that, there might be an open position. If there is open position then it will be open and current P&L will be shown. in the next fetch if the trade is closed then the p&L will be refreshed accordingly.
+5. There will be a field representing the status of the trade open/ close.

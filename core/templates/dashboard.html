@@ -1,4 +1,10 @@
 {% extends 'base.html' %}
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{{ pnl_dates|json_script:"pnlDates" }}
+{{ pnl_values|json_script:"pnlValues" }}
+{% endblock %}
+
 {% block content %}
 <style>
   body, .container {
@@ -61,11 +67,10 @@
     }
     .btn, .btn-sm {
       font-size: 0.95rem;
-    }
-  }
+    }  }
 </style>
 <div class="container my-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-3"></div>
     <h2 class="fw-bold">Dashboard</h2>
     <div>
       <span class="me-2">Welcome, <strong>{{ user.email }}</strong></span>
@@ -73,30 +78,8 @@
       <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm ms-2">Logout</a>
     </div>
   </div>
-
   <div class="row mb-4">
-    <div class="col-md-6">
-      <div class="card shadow-sm mb-3">
-        <div class="card-header bg-primary text-white">Your Accounts</div>
-        <ul class="list-group list-group-flush">
-          {% for account in accounts %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <span>{{ account.name }} <span class="badge bg-light text-dark">{{ account.currency }}</span> <span class="ms-2">Balance: <strong>{{ account.balance }}</strong></span></span>
-              <span>
-                <a href="{% url 'account_edit' account.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
-                <a href="{% url 'account_delete' account.pk %}" class="btn btn-sm btn-outline-danger ms-1">Delete</a>
-              </span>
-            </li>
-          {% empty %}
-            <li class="list-group-item">No accounts yet.</li>
-          {% endfor %}
-        </ul>
-        <div class="card-footer text-end">
-          <a href="{% url 'account_create' %}" class="btn btn-success btn-sm">Add Account</a>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
       <div class="card shadow-sm mb-3">
         <div class="card-header bg-success text-white">Summary</div>
         <div class="card-body">
@@ -116,13 +99,6 @@
   </div>
 
   <form method="get" class="row g-2 mb-3 align-items-end">
-    <div class="col-md-2">
-      <select name="account_number" class="form-select">
-        {% for pk, name in account_options %}
-          <option value="{{ pk }}" {% if filter.account_number == pk|stringformat:"s" %}selected{% elif not filter.account_number and pk == default_account %}selected{% endif %}>{{ name }}</option>
-        {% endfor %}
-      </select>
-    </div>
     <div class="col-md-2">
       <select name="instrument" class="form-select select2-multi" id="id_instrument" multiple>
         <option value="ALL" {% if 'ALL' in filter.instrument %}selected{% endif %}>All Instruments</option>
@@ -216,23 +192,20 @@
     </div>
   </div>
 </div>
-
-{% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 {% endblock %}
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 $(document).ready(function() {
-  $('#id_instrument').select2({
+  // Initialize Select2 - exactly like working templates
+  $('.select2-multi').select2({
     placeholder: 'Select instrument(s)',
     allowClear: true,
-    width: '100%',
+    width: '100%'
   });
-});
 
   // Make trade rows clickable (except when clicking action buttons)
   document.querySelectorAll('.trade-row').forEach(function(row) {
@@ -256,34 +229,31 @@ $(document).ready(function() {
   });
 
   // Chart.js code for PnL chart
-  document.addEventListener('DOMContentLoaded', function() {
-    const pnlDatesElem = document.getElementById('pnlDates');
-    const pnlValuesElem = document.getElementById('pnlValues');
-    if (pnlDatesElem && pnlValuesElem && document.getElementById('pnlChart')) {
-      const labels = JSON.parse(pnlDatesElem.textContent);
-      const data = JSON.parse(pnlValuesElem.textContent);
-      const ctx = document.getElementById('pnlChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'PnL Over Time',
-            data: data,
-            borderColor: 'rgba(75, 192, 192, 1)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            fill: true,
-            tension: 0.1
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } }
-        }
-      });
-    }
-  });
+  const pnlDatesElem = document.getElementById('pnlDates');
+  const pnlValuesElem = document.getElementById('pnlValues');
+  if (pnlDatesElem && pnlValuesElem && document.getElementById('pnlChart')) {
+    const labels = JSON.parse(pnlDatesElem.textContent);
+    const data = JSON.parse(pnlValuesElem.textContent);
+    const ctx = document.getElementById('pnlChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'PnL Over Time',
+          data: data,
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          fill: true,
+          tension: 0.1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+});
 </script>
-{{ pnl_dates|json_script:"pnlDates" }}
-{{ pnl_values|json_script:"pnlValues" }}
 {% endblock %}

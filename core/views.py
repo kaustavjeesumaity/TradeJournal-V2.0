@@ -1,13 +1,17 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
-from .forms import CustomUserCreationForm, CustomAuthenticationForm, AccountForm, TradeForm, MT5FetchForm, TradePlanForm, TradePlanEventForm
-from .forms_profile import ProfileForm
-from .models import Account, Trade, TradeAttachment, Instrument, DailyChecklistTemplate, DailyChecklistItem, UserDailyChecklistProgress, TradePlan, TradePlanAttachment, TradePlanEvent, TradePlanEventAttachment
+from .forms import (
+    CustomUserCreationForm, CustomAuthenticationForm, AccountForm, TradeForm, MT5FetchForm, TradePlanForm, TradePlanEventForm,
+    UserForm, MilestoneForm, LessonForm, AchievementForm, ReviewForm,
+    CourseForm, BookForm, KeyLessonForm, MistakeForm, MT5AccountForm
+)
+from .models import Account, Trade, TradeAttachment, Instrument, DailyChecklistTemplate, DailyChecklistItem, UserDailyChecklistProgress, TradePlan, TradePlanAttachment, TradePlanEvent, TradePlanEventAttachment, Milestone, Lesson, Achievement, Review, Course, Book, KeyLesson, Mistake
 from django.urls import reverse
 from django.db.models import Sum, Count, Q, F, ExpressionWrapper, DecimalField
 from django.utils.dateparse import parse_date
 import csv
+import sys
 from django.http import HttpResponse
 from django.contrib import messages
 from decimal import Decimal
@@ -59,12 +63,31 @@ def logout_view(request):
 @login_required
 def dashboard_view(request):
     accounts = Account.objects.filter(user=request.user)
-    trades = Trade.objects.filter(account__user=request.user)
+    
+    # Handle account selection
+    selected_account_id = request.GET.get('account') or request.session.get('selected_account_id')
+    selected_account = None
+    
+    if selected_account_id:
+        try:
+            selected_account = accounts.get(id=selected_account_id)
+            request.session['selected_account_id'] = selected_account_id
+        except Account.DoesNotExist:
+            pass
+    
+    if not selected_account and accounts.exists():
+        selected_account = accounts.first()
+        request.session['selected_account_id'] = selected_account.id
+    
+    # Only show trades for the selected account if one is selected
+    if selected_account:
+        trades = Trade.objects.filter(account=selected_account)
+    else:
+        trades = Trade.objects.filter(account__user=request.user)
 
-    # Filtering
+    # Filtering (account selection is now only via navbar, not filter form)
     instrument = request.GET.getlist('instrument')
     outcome = request.GET.get('outcome', '')
-    account_number = request.GET.get('account_number', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
     sort = request.GET.get('sort', 'exit_date')
@@ -78,12 +101,6 @@ def dashboard_view(request):
         trades = trades.filter(exit_price__gt=F('entry_price'))
     elif outcome == 'loss':
         trades = trades.filter(exit_price__lt=F('entry_price'))
-    if account_number:
-        try:
-            account_number_int = int(account_number)
-            trades = trades.filter(account__pk=account_number_int)
-        except ValueError:
-            pass
     if start_date:
         trades = trades.filter(exit_date__date__gte=parse_date(start_date))
     if end_date:
@@ -109,7 +126,7 @@ def dashboard_view(request):
     account_summaries = []
     for account in accounts:
         account_trades = trades.filter(account=account)
-        account_pnl = sum([t.pnl for t in account_trades])
+        account_pnl = sum([t.pnl or 0 for t in account_trades])
         rate = conversion_rates.get(account.currency, 1.0) / conversion_rates.get(base_currency, 1.0)
         account_summary = {
             'name': account.name,
@@ -120,19 +137,23 @@ def dashboard_view(request):
             'converted_pnl': float(account_pnl) * rate,
         }
         account_summaries.append(account_summary)
-
+        
     # Summary statistics
-    total_pnl = sum([t.pnl for t in trades])
+    total_pnl = sum([t.pnl or 0 for t in trades])
     total_trades = trades.count()
     wins = trades.filter(exit_price__gt=F('entry_price')).count()
     losses = trades.filter(exit_price__lt=F('entry_price')).count()
     win_rate = (wins / total_trades * 100) if total_trades else 0
     avg_risk_reward = (
-        sum([(t.exit_price - t.entry_price) / abs(t.entry_price) for t in trades if t.entry_price != 0]) / total_trades
+        sum([
+            ((t.exit_price or Decimal(0)) - (t.entry_price or Decimal(0))) / abs(t.entry_price)
+            for t in trades
+            if t.entry_price is not None and t.exit_price is not None
+        ]) / total_trades
         if total_trades else 0
     )
-    pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in trades.order_by('exit_date')]
-    pnl_values = [float(t.pnl) for t in trades.order_by('exit_date')]
+    pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in trades.order_by('exit_date') if t.exit_date]
+    pnl_values = [float(t.pnl or 0) for t in trades.order_by('exit_date')]
 
     # Instrument analytics
     instrument_stats = []
@@ -141,8 +162,8 @@ def dashboard_view(request):
         instrument_map[t.instrument].append(t)
     for instrument_name, tlist in instrument_map.items():
         count = len(tlist)
-        wins = len([t for t in tlist if t.exit_price > t.entry_price])
-        pnl = sum([t.pnl for t in tlist])
+        wins = sum([1 for t in tlist if t.pnl and t.pnl > 0])
+        pnl = sum([t.pnl or 0 for t in tlist])
         win_rate_inst = (wins / count * 100) if count else 0
         instrument_stats.append({
             'instrument': instrument_name,
@@ -150,18 +171,17 @@ def dashboard_view(request):
             'win_rate': win_rate_inst,
             'pnl': pnl,
         })
-
     # Outcome analytics
     outcome_stats = []
     for outcome_label, filter_func in [
-        ("Win", lambda t: t.exit_price > t.entry_price),
-        ("Loss", lambda t: t.exit_price < t.entry_price),
-        ("Break-even", lambda t: t.exit_price == t.entry_price),
+        ("Win", lambda t: t.pnl and t.pnl > 0),
+        ("Loss", lambda t: t.pnl and t.pnl < 0),
+        ("Break-even", lambda t: t.pnl and t.pnl == 0),
     ]:
         tlist = [t for t in trades if filter_func(t)]
         count = len(tlist)
         wins = len([t for t in tlist if t.exit_price > t.entry_price])
-        pnl = sum([t.pnl for t in tlist])
+        pnl = sum([t.pnl or 0 for t in tlist])
         win_rate_outcome = (wins / count * 100) if count else 0
         outcome_stats.append({
             'outcome': outcome_label,
@@ -173,12 +193,9 @@ def dashboard_view(request):
     instrument_list = list(Instrument.objects.values_list('name', flat=True).order_by('name'))
     account_options = [(account.pk, account.name) for account in accounts]
     default_account = account_options[0][0] if account_options else ''
-
-    # For filter state in template, always pass a list for instrument
     filter_dict = {
         'instrument': instrument,
         'outcome': outcome,
-        'account_number': account_number,
         'start_date': start_date,
         'end_date': end_date,
         'sort': sort,
@@ -186,6 +203,7 @@ def dashboard_view(request):
 
     return render(request, 'dashboard.html', {
         'accounts': accounts,
+        'selected_account': selected_account,
         'account_summaries': account_summaries,
         'trades': page_obj.object_list if 'page_obj' in locals() else trades,
         'page_obj': page_obj if 'page_obj' in locals() else None,
@@ -207,12 +225,24 @@ def dashboard_view(request):
 @login_required
 def advanced_analytics_view(request):
     accounts = Account.objects.filter(user=request.user)
-    trades = Trade.objects.filter(account__user=request.user)
+    selected_account_id = request.GET.get('account') or request.session.get('selected_account_id')
+    selected_account = None
+    if selected_account_id:
+        try:
+            selected_account = accounts.get(id=selected_account_id)
+        except Account.DoesNotExist:
+            pass
+    if not selected_account and accounts.exists():
+        selected_account = accounts.first()
+    # Only show trades for the selected account if one is selected
+    if selected_account:
+        trades = Trade.objects.filter(account=selected_account)
+    else:
+        trades = Trade.objects.filter(account__user=request.user)
 
-    # Filtering (reuse dashboard logic for consistency)
+    # Filtering (reuse dashboard logic for consistency, account selection is only via navbar)
     instrument = request.GET.getlist('instrument')
     outcome = request.GET.get('outcome', '')
-    account_number = request.GET.get('account_number', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
     sort = request.GET.get('sort', 'exit_date')
@@ -223,12 +253,6 @@ def advanced_analytics_view(request):
         trades = trades.filter(exit_price__gt=F('entry_price'))
     elif outcome == 'loss':
         trades = trades.filter(exit_price__lt=F('entry_price'))
-    if account_number:
-        try:
-            account_number_int = int(account_number)
-            trades = trades.filter(account__pk=account_number_int)
-        except ValueError:
-            pass
     if start_date:
         trades = trades.filter(exit_date__date__gte=parse_date(start_date))
     if end_date:
@@ -238,7 +262,7 @@ def advanced_analytics_view(request):
 
     # PnL over time
     pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in trades.order_by('exit_date')]
-    pnl_values = [float(t.net_pnl) for t in trades.order_by('exit_date')]
+    pnl_values = [float(t.net_pnl or 0) for t in trades.order_by('exit_date')]
 
     # Win/Loss ratio
     win_count = trades.filter(exit_price__gt=F('entry_price')).count()
@@ -251,23 +275,19 @@ def advanced_analytics_view(request):
         holding_hours = (t.exit_date - t.entry_date).total_seconds() / 3600.0 if t.exit_date and t.entry_date else 0
         holding_map[t.instrument].append(holding_hours)
     holding_labels = list(holding_map.keys())
-    holding_data = [round(sum(v)/len(v), 2) if v else 0 for v in holding_map.values()]
-
-    # Tag performance
+    holding_data = [round(sum(v)/len(v), 2) if v else 0 for v in holding_map.values()]    # Tag performance
     tag_map = defaultdict(list)
     for t in trades:
         if hasattr(t, 'tags'):
             for tag in t.tags.all():
-                tag_map[str(tag)].append(t.net_pnl)
+                tag_map[str(tag)].append(t.net_pnl or 0)
     tag_labels = list(tag_map.keys())
-    tag_data = [round(sum(v), 2) for v in tag_map.values()]
-
-    # Session performance
+    tag_data = [round(sum(v), 2) for v in tag_map.values()]    # Session performance
     session_map = defaultdict(list)
     for t in trades:
         session = getattr(t, 'session', None)
         if session:
-            session_map[str(session)].append(t.net_pnl)  # Use str(session) for JSON serializability
+            session_map[str(session)].append(t.net_pnl or 0)  # Use str(session) for JSON serializability
     session_labels = list(session_map.keys())
     session_data = [round(sum(v), 2) for v in session_map.values()]
 
@@ -295,7 +315,6 @@ def advanced_analytics_view(request):
     # Best/worst trades
     best_trade = trades.order_by('-net_pnl').first()
     worst_trade = trades.order_by('net_pnl').first()
-
     # Milestones (example: 10th, 50th, 100th trade, or custom logic)
     milestones = []
     trade_count = trades.count()
@@ -303,9 +322,9 @@ def advanced_analytics_view(request):
         if trade_count >= m:
             milestones.append(f"{m} trades completed!")
     if best_trade:
-        milestones.append(f"Best trade: {best_trade.instrument} ({best_trade.exit_date.strftime('%Y-%m-%d')}) PnL: {best_trade.net_pnl:.2f}")
+        milestones.append(f"Best trade: {best_trade.instrument} ({best_trade.exit_date.strftime('%Y-%m-%d')}) PnL: {best_trade.net_pnl or 0:.2f}")
     if worst_trade:
-        milestones.append(f"Worst trade: {worst_trade.instrument} ({worst_trade.exit_date.strftime('%Y-%m-%d')}) PnL: {worst_trade.net_pnl:.2f}")
+        milestones.append(f"Worst trade: {worst_trade.instrument} ({worst_trade.exit_date.strftime('%Y-%m-%d')}) PnL: {worst_trade.net_pnl or 0:.2f}")
 
     return render(request, 'advanced_analytics.html', {
         'pnl_dates': pnl_dates,
@@ -325,21 +344,103 @@ def advanced_analytics_view(request):
 
 @login_required
 def account_create_view(request):
-    # Prevent manual creation of MT5-linked accounts
     if request.method == 'POST':
         form = AccountForm(request.POST)
         if form.is_valid():
-            # If user tries to submit MT5 fields, block it
-            if form.cleaned_data.get('mt5_account_number') or form.cleaned_data.get('mt5_server'):
-                form.add_error(None, 'Manual creation of MT5-linked accounts is not allowed. Use the MT5 fetch tool.')
+            account_source = form.cleaned_data.get('account_source')
+            if account_source == 'mt5':
+                # Pass account name as GET param for pre-filling
+                account_name = form.cleaned_data.get('name', '')
+                return redirect(f"{reverse('mt5_account_connect')}?account_name={account_name}")
             else:
+                # Create manual account
                 account = form.save(commit=False)
                 account.user = request.user
                 account.save()
+                messages.success(request, f'Account "{account.name}" created successfully!')
                 return redirect('dashboard')
     else:
         form = AccountForm()
     return render(request, 'account_form.html', {'form': form})
+
+
+@login_required 
+def mt5_account_connect_view(request):
+    """Handle MT5 account connection"""
+    if request.method == 'POST':
+        form = MT5AccountForm(request.POST)
+        if form.is_valid():
+            try:
+                if mt5 is None:
+                    messages.error(request, 'MetaTrader 5 library is not installed.')
+                    return redirect('account_create')
+                
+                # Initialize MT5 connection
+                if not mt5.initialize():
+                    messages.error(request, 'Failed to initialize MetaTrader 5.')
+                    return redirect('account_create')
+                
+                # Login to MT5
+                login_result = mt5.login(
+                    login=int(form.cleaned_data['mt5_account']),
+                    server=form.cleaned_data['mt5_server'],
+                    password=form.cleaned_data['mt5_password']
+                )
+                
+                if login_result:
+                    # Get account info
+                    account_info = mt5.account_info()
+                    if account_info:
+                        # Create account with MT5 data
+                        account = Account.objects.create(
+                            user=request.user,
+                            name=form.cleaned_data['account_name'],
+                            broker=account_info.company,
+                            account_type='demo' if 'demo' in form.cleaned_data['mt5_server'].lower() else 'real',
+                            leverage=account_info.leverage,
+                            equity=account_info.equity,
+                            margin=account_info.margin,
+                            balance=account_info.balance,
+                            currency=account_info.currency,
+                            mt5_account_number=form.cleaned_data['mt5_account'],
+                            mt5_server=form.cleaned_data['mt5_server'],
+                            mt5_last_fetch=timezone.now()
+                        )
+                        
+                        messages.success(request, f'MT5 account "{account.name}" connected successfully!')
+                        
+                        # Optionally fetch recent trades
+                        try:
+                            fetch_mt5_trades_for_account(account)
+                            messages.info(request, 'Recent trades have been imported from MT5.')
+                        except Exception as e:
+                            messages.warning(request, f'Account created but failed to import trades: {str(e)}')
+                        
+                        return redirect('dashboard')
+                    else:
+                        messages.error(request, 'Failed to get account information from MT5.')
+                else:
+                    messages.error(request, 'Failed to login to MT5. Please check your credentials.')
+                
+                mt5.shutdown()
+            except Exception as e:
+                messages.error(request, f'Error connecting to MT5: {str(e)}')
+    else:
+        # Pre-fill account_name from GET param if present
+        initial = {}
+        account_name = request.GET.get('account_name')
+        if account_name:
+            initial['account_name'] = account_name
+        form = MT5AccountForm(initial=initial)
+        # Get existing MT5 accounts for the user
+        existing_mt5_accounts = Account.objects.filter(
+            user=request.user,
+            mt5_account_number__isnull=False
+        ).order_by('-mt5_last_fetch')
+    return render(request, 'mt5_account_form.html', {
+        'form': form,
+        'existing_mt5_accounts': existing_mt5_accounts
+    })
 
 @login_required
 def trade_create_view(request):
@@ -395,6 +496,15 @@ def trade_edit_view(request, pk):
     if request.method == 'POST':
         form = TradeForm(request.POST, request.FILES, instance=trade)
         form.fields['account'].queryset = Account.objects.filter(user=request.user)
+        print(f"Form is valid: {form.is_valid()}")
+        if not form.is_valid():
+            print(f"Form errors: {form.errors}")
+            print(f"Form non-field errors: {form.non_field_errors()}")
+            for field, errors in form.errors.items():
+                print(f"Field '{field}' errors: {errors}")
+            # Also print form data for debugging
+            print(f"Form data keys: {list(request.POST.keys())}")
+            print(f"Form cleaned_data (partial): {getattr(form, 'cleaned_data', 'No cleaned_data')}")
         if form.is_valid():
             trade = form.save(commit=False)
             # Calculate net_pnl if gross_pnl and charges are not provided
@@ -404,12 +514,15 @@ def trade_edit_view(request, pk):
                 trade.gross_pnl = gross_pnl
                 trade.charges = charges
                 trade.net_pnl = gross_pnl - charges
-            trade.save()
-            form.save_m2m()
-            # Handle new attachments
-            for f in request.FILES.getlist('attachments'):
-                TradeAttachment.objects.create(trade=trade, file=f)
-            return redirect('dashboard')
+            if trade.account.user == request.user:
+                trade.save()
+                form.save_m2m()
+                # Handle new attachments
+                for f in request.FILES.getlist('attachments'):
+                    TradeAttachment.objects.create(trade=trade, file=f)
+                return redirect('trade_detail', pk=trade.pk)
+            else:
+                form.add_error('account', 'Invalid account selection.')
     else:
         form = TradeForm(instance=trade)
         form.fields['account'].queryset = Account.objects.filter(user=request.user)
@@ -426,12 +539,12 @@ def trade_delete_view(request, pk):
 @login_required
 def profile_view(request):
     if request.method == 'POST':
-        form = ProfileForm(request.POST, instance=request.user)
+        form = UserForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
             return redirect('profile')
     else:
-        form = ProfileForm(instance=request.user)
+        form = UserForm(instance=request.user)
     return render(request, 'profile.html', {'form': form})
 
 @login_required
@@ -440,7 +553,7 @@ def trade_export_csv(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="trades.csv"'
     writer = csv.writer(response)
-    writer.writerow(['account', 'instrument', 'entry_price', 'exit_price', 'entry_date', 'exit_date', 'quantity', 'notes'])
+    writer.writerow(['account', 'instrument', 'entry_price', 'exit_price', 'entry_date', 'exit_date', 'size', 'notes'])
     for t in trades:
         writer.writerow([
             t.account.name,
@@ -449,7 +562,7 @@ def trade_export_csv(request):
             t.exit_price,
             t.entry_date,
             t.exit_date,
-            t.quantity,
+            t.size,
             t.notes
         ])
     return response
@@ -473,7 +586,7 @@ def trade_import_csv(request):
                 exit_price=row['exit_price'],
                 entry_date=row['entry_date'],
                 exit_date=row['exit_date'],
-                quantity=row['quantity'],
+                size=row['size'],
                 notes=row.get('notes', '')
             )
             count += 1
@@ -502,33 +615,28 @@ def position_size_calculator(request):
 def fetch_mt5_trades(request):
     message = None
     trades_fetched = 0
+    trades_updated = 0
+    
     if request.method == 'POST':
-        form = MT5FetchForm(request.POST)
+        form = MT5FetchForm(user=request.user, data=request.POST)
         if form.is_valid():
-            mt5_account = form.cleaned_data['mt5_account']
-            mt5_server = form.cleaned_data['mt5_server']
+            selected_account = form.cleaned_data['mt5_account']
             mt5_password = form.cleaned_data['mt5_password']
+            
             if not mt5:
                 message = 'MetaTrader5 package is not installed.'
             else:
-                # Find or create the Account for this user+mt5_account+mt5_server
-                account, created = Account.objects.get_or_create(
-                    user=request.user,
-                    mt5_account_number=mt5_account,
-                    mt5_server=mt5_server,
-                    defaults={
-                        'name': f"MT5 {mt5_account} @ {mt5_server}",
-                        'balance': 0,
-                        'currency': 'USD',
-                    }
-                )
+                # Use the selected account's MT5 credentials
+                mt5_account = selected_account.mt5_account_number
+                mt5_server = selected_account.mt5_server
+                
                 # Initialize MT5
                 if not mt5.initialize(server=mt5_server, login=int(mt5_account), password=mt5_password):
                     message = f"MT5 initialize() failed: {mt5.last_error()}"
                 else:
                     # Fetch only trades after last fetch
                     from datetime import datetime, timezone
-                    last_fetch = account.mt5_last_fetch
+                    last_fetch = selected_account.mt5_last_fetch
                     if last_fetch:
                         from_date = last_fetch
                     else:
@@ -546,6 +654,7 @@ def fetch_mt5_trades(request):
                             # Only consider buy/sell deals (type 0/1)
                             if hasattr(order, 'type') and order.type in (0, 1):
                                 deals_by_position[getattr(order, 'position_id', None)].append(order)
+                        
                         for position_id, deals in deals_by_position.items():
                             if not deals or position_id is None:
                                 continue
@@ -553,46 +662,186 @@ def fetch_mt5_trades(request):
                             deals = sorted(deals, key=lambda d: d.time)
                             entry_deal = deals[0]
                             exit_deal = deals[-1]
+                            
                             # Aggregate P&L and charges from all deals in this position
                             gross_pnl = sum(getattr(d, 'profit', 0) for d in deals)
                             charges = sum((getattr(d, 'commission', 0) or 0) + (getattr(d, 'swap', 0) or 0) + (getattr(d, 'fee', 0) or 0) for d in deals)
                             net_pnl = gross_pnl - charges
+                            
                             # Convert times
                             entry_time = datetime.fromtimestamp(entry_deal.time, tz=timezone.utc) if isinstance(entry_deal.time, (int, float)) else entry_deal.time
                             exit_time = datetime.fromtimestamp(exit_deal.time, tz=timezone.utc) if isinstance(exit_deal.time, (int, float)) else exit_deal.time
+                            
                             # Check if trade already exists (by position_id in notes)
-                            if Trade.objects.filter(account=account, notes__contains=f"MT5 position: {position_id}").exists():
-                                continue
+                            existing_trade = Trade.objects.filter(account=selected_account, notes__contains=f"MT5 position: {position_id}").first()
+                            
                             # Add instrument to Instrument model if not exists
                             instrument_name = getattr(entry_deal, 'symbol', '')
                             if instrument_name and not Instrument.objects.filter(name=instrument_name).exists():
                                 Instrument.objects.create(name=instrument_name)
-                            Trade.objects.create(
-                                account=account,
-                                instrument=instrument_name,
-                                entry_price=getattr(entry_deal, 'price', 0),
-                                exit_price=getattr(exit_deal, 'price', 0),
-                                entry_date=entry_time,
-                                exit_date=exit_time,
-                                quantity=getattr(entry_deal, 'volume', 0),
-                                notes=f"MT5 position: {position_id}, entry ticket: {getattr(entry_deal, 'ticket', '')}, exit ticket: {getattr(exit_deal, 'ticket', '')}",
-                                gross_pnl=gross_pnl,
-                                charges=charges,
-                                net_pnl=gross_pnl-charges
-                            )
-                            trades_fetched += 1
+                            
+                            if existing_trade:
+                                # Update existing trade if it has changed (e.g., from open to closed)
+                                # Determine if position is closed (more than one deal indicates closure)
+                                is_closed = len(deals) > 1 and exit_time > entry_time
+                                new_status = 'closed' if is_closed else 'open'
+                                
+                                # Check if the trade needs updating
+                                needs_update = False
+                                if existing_trade.status != new_status:
+                                    existing_trade.status = new_status
+                                    needs_update = True
+                                
+                                if is_closed and existing_trade.exit_price != getattr(exit_deal, 'price', 0):
+                                    existing_trade.exit_price = getattr(exit_deal, 'price', 0)
+                                    existing_trade.exit_date = exit_time
+                                    needs_update = True
+                                
+                                # Update P&L calculations
+                                if existing_trade.gross_pnl != gross_pnl or existing_trade.charges != charges:
+                                    existing_trade.gross_pnl = gross_pnl
+                                    existing_trade.charges = charges
+                                    existing_trade.net_pnl = gross_pnl - charges
+                                    needs_update = True
+                                
+                                # Update notes with latest ticket information
+                                new_notes = f"MT5 position: {position_id}, entry ticket: {getattr(entry_deal, 'ticket', '')}, exit ticket: {getattr(exit_deal, 'ticket', '')}"
+                                if existing_trade.notes != new_notes:
+                                    existing_trade.notes = new_notes
+                                    needs_update = True
+                                
+                                if needs_update:
+                                    existing_trade.save()
+                                    trades_updated += 1  # Count as updated
+                            else:
+                                # Create new trade
+                                # Determine status based on whether position is closed
+                                is_closed = len(deals) > 1 and exit_time > entry_time
+                                trade_status = 'closed' if is_closed else 'open'
+                                
+                                Trade.objects.create(
+                                    account=selected_account,
+                                    instrument=instrument_name,
+                                    entry_price=getattr(entry_deal, 'price', 0),
+                                    exit_price=getattr(exit_deal, 'price', 0) if is_closed else None,
+                                    entry_date=entry_time,
+                                    exit_date=exit_time if is_closed else None,
+                                    size=getattr(entry_deal, 'volume', 0),
+                                    status=trade_status,
+                                    notes=f"MT5 position: {position_id}, entry ticket: {getattr(entry_deal, 'ticket', '')}, exit ticket: {getattr(exit_deal, 'ticket', '')}",
+                                    gross_pnl=gross_pnl,
+                                    charges=charges,
+                                    net_pnl=gross_pnl-charges
+                                )
+                                trades_fetched += 1
+                            
                             # Track latest trade time
                             if not latest_trade_time or exit_time > latest_trade_time:
                                 latest_trade_time = exit_time
+                        
                         # Update last fetch timestamp
                         if latest_trade_time:
-                            account.mt5_last_fetch = latest_trade_time
-                            account.save()
-                        message = f"Fetched {trades_fetched} new trades from MT5."
+                            selected_account.mt5_last_fetch = latest_trade_time
+                            selected_account.save()
+                        
+                        # Create descriptive message
+                        message_parts = []
+                        if trades_fetched > 0:
+                            message_parts.append(f"{trades_fetched} new trade{'s' if trades_fetched != 1 else ''}")
+                        if trades_updated > 0:
+                            message_parts.append(f"{trades_updated} updated trade{'s' if trades_updated != 1 else ''}")
+                        
+                        if message_parts:
+                            message = f"Fetched {' and '.join(message_parts)} from MT5 account '{selected_account.name}'."
+                        else:
+                            message = "No new or updated trades found in MT5."
                     mt5.shutdown()
     else:
-        form = MT5FetchForm()
+        form = MT5FetchForm(user=request.user)
+
+
+    
     return render(request, 'fetch_mt5_trades.html', {'form': form, 'message': message})
+
+def fetch_mt5_trades_for_account(account):
+    """Helper function to fetch trades for a specific MT5 account"""
+    if not account.mt5_account_number or not account.mt5_server:
+        raise ValueError("Account is not linked to MT5")
+    
+    if mt5 is None:
+        raise ImportError("MetaTrader 5 library is not installed")
+    
+    # Note: This function assumes MT5 is already initialized and logged in
+    # In a real implementation, you might want to store encrypted credentials
+    # or require re-authentication for security
+    
+    # Get deals from the last 30 days
+    from_date = datetime.now() - timedelta(days=30)
+    to_date = datetime.now()
+    
+    deals = mt5.history_deals_get(from_date, to_date)
+    
+    if deals is None:
+        return 0
+    
+    imported_count = 0
+    
+    for deal in deals:
+        # Skip if not a trade exit (entry = 0, exit = 1)
+        if deal.entry != 1:
+            continue
+            
+        # Check if trade already exists
+        existing_trade = Trade.objects.filter(
+            account=account,
+            entry_date__date=datetime.fromtimestamp(deal.time).date(),
+            instrument=deal.symbol,
+            exit_price=deal.price
+        ).first()
+        
+        if existing_trade:
+            continue
+        
+        # Get corresponding entry deal
+        entry_deals = mt5.history_deals_get(
+            datetime.fromtimestamp(deal.time) - timedelta(days=7),
+            datetime.fromtimestamp(deal.time),
+            position=deal.position_id
+        )
+        
+        entry_deal = None
+        if entry_deals:
+            for ed in entry_deals:
+                if ed.entry == 0 and ed.position_id == deal.position_id:
+                    entry_deal = ed
+                    break
+        
+        if not entry_deal:
+            continue
+        
+        # Create trade
+        Trade.objects.create(
+            account=account,
+            instrument=deal.symbol,
+            direction='long' if deal.type == 0 else 'short',
+            status='closed',
+            entry_price=entry_deal.price,
+            exit_price=deal.price,
+            entry_date=datetime.fromtimestamp(entry_deal.time),
+            exit_date=datetime.fromtimestamp(deal.time),
+            size=abs(deal.volume),
+            gross_pnl=deal.profit,
+            charges=deal.commission + deal.swap + deal.fee,
+            net_pnl=deal.profit - (deal.commission + deal.swap + deal.fee)
+        )
+        
+        imported_count += 1
+    
+    # Update last fetch time
+    account.mt5_last_fetch = timezone.now()
+    account.save()
+    
+    return imported_count
 
 class AccountViewSet(viewsets.ModelViewSet):
     serializer_class = AccountSerializer
@@ -949,3 +1198,324 @@ def trade_plan_event_attachment_delete_view(request, attachment_id):
         att.delete()
         return redirect('trade_plan_event_edit', event_id=event.pk)
     return render(request, 'trade_attachment_confirm_delete.html', {'attachment': att, 'event': event, 'plan': plan, 'is_event_attachment': True})
+
+@login_required
+def milestone_list_view(request):
+    milestones = Milestone.objects.all()
+    return render(request, 'milestone_list.html', {'milestones': milestones})
+
+@login_required
+def milestone_create_view(request):
+    if request.method == 'POST':
+        form = MilestoneForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('milestone_list')
+    else:
+        form = MilestoneForm()
+    return render(request, 'milestone_form.html', {'form': form})
+
+@login_required
+def milestone_edit_view(request, pk):
+    milestone = get_object_or_404(Milestone, pk=pk)
+    if request.method == 'POST':
+        form = MilestoneForm(request.POST, instance=milestone)
+        if form.is_valid():
+            form.save()
+            return redirect('milestone_list')
+    else:
+        form = MilestoneForm(instance=milestone)
+    return render(request, 'milestone_form.html', {'form': form, 'edit': True})
+
+@login_required
+def milestone_delete_view(request, pk):
+    milestone = get_object_or_404(Milestone, pk=pk, user=request.user)
+    if request.method == 'POST':
+        milestone.delete()
+        return redirect('milestone_list')
+    return render(request, 'milestone_confirm_delete.html', {'milestone': milestone})
+
+@login_required
+def lesson_list_view(request):
+    lessons = Lesson.objects.all()
+    return render(request, 'lesson_list.html', {'lessons': lessons})
+
+@login_required
+def lesson_create_view(request):
+    if request.method == 'POST':
+        form = LessonForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('lesson_list')
+    else:
+        form = LessonForm()
+    return render(request, 'lesson_form.html', {'form': form})
+
+@login_required
+def lesson_edit_view(request, pk):
+    lesson = get_object_or_404(Lesson, pk=pk)
+    if request.method == 'POST':
+        form = LessonForm(request.POST, instance=lesson)
+        if form.is_valid():
+            form.save()
+            return redirect('lesson_list')
+    else:
+        form = LessonForm(instance=lesson)
+    return render(request, 'lesson_form.html', {'form': form, 'edit': True})
+
+@login_required
+def lesson_delete_view(request, pk):
+    lesson = get_object_or_404(Lesson, pk=pk, user=request.user)
+    if request.method == 'POST':
+        lesson.delete()
+        return redirect('lesson_list')
+    return render(request, 'lesson_confirm_delete.html', {'lesson': lesson})
+
+@login_required
+def achievement_list_view(request):
+    achievements = Achievement.objects.all()
+    return render(request, 'achievement_list.html', {'achievements': achievements})
+
+@login_required
+def achievement_create_view(request):
+    if request.method == 'POST':
+        form = AchievementForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('achievement_list')
+    else:
+        form = AchievementForm()
+    return render(request, 'achievement_form.html', {'form': form})
+
+@login_required
+def achievement_edit_view(request, pk):
+    achievement = get_object_or_404(Achievement, pk=pk)
+    if request.method == 'POST':
+        form = AchievementForm(request.POST, instance=achievement)
+        if form.is_valid():
+            form.save()
+            return redirect('achievement_list')
+    else:
+        form = AchievementForm(instance=achievement)
+    return render(request, 'achievement_form.html', {'form': form, 'edit': True})
+
+@login_required
+def achievement_delete_view(request, pk):
+    achievement = get_object_or_404(Achievement, pk=pk, user=request.user)
+    if request.method == 'POST':
+        achievement.delete()
+        return redirect('achievement_list')
+    return render(request, 'achievement_confirm_delete.html', {'achievement': achievement})
+
+@login_required
+def review_list_view(request):
+    reviews = Review.objects.all()
+    return render(request, 'review_list.html', {'reviews': reviews})
+
+@login_required
+def review_create_view(request):
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('review_list')
+    else:
+        form = ReviewForm()
+    return render(request, 'review_form.html', {'form': form})
+
+@login_required
+def review_edit_view(request, pk):
+    review = get_object_or_404(Review, pk=pk)
+    if request.method == 'POST':
+        form = ReviewForm(request.POST, instance=review)
+        if form.is_valid():
+            form.save()
+            return redirect('review_list')
+    else:
+        form = ReviewForm(instance=review)
+    return render(request, 'review_form.html', {'form': form, 'edit': True})
+
+@login_required
+def review_delete_view(request, pk):
+    review = get_object_or_404(Review, pk=pk, user=request.user)
+    if request.method == 'POST':
+        review.delete()
+        return redirect('review_list')
+    return render(request, 'review_confirm_delete.html', {'review': review})
+
+@login_required
+def course_list_view(request):
+    courses = Course.objects.filter(user=request.user)
+    return render(request, 'course_list.html', {'courses': courses})
+
+@login_required
+def course_create_view(request):
+    if request.method == 'POST':
+        form = CourseForm(request.POST)
+        if form.is_valid():
+            course = form.save(commit=False)
+            course.user = request.user
+            course.save()
+            return redirect('course_list')
+    else:
+        form = CourseForm()
+    return render(request, 'course_form.html', {'form': form})
+
+@login_required
+def course_edit_view(request, pk):
+    course = get_object_or_404(Course, pk=pk, user=request.user)
+    if request.method == 'POST':
+        form = CourseForm(request.POST, instance=course)
+        if form.is_valid():
+            form.save()
+            return redirect('course_list')
+    else:
+        form = CourseForm(instance=course)
+    return render(request, 'course_form.html', {'form': form, 'edit': True})
+
+@login_required
+def course_delete_view(request, pk):
+    course = get_object_or_404(Course, pk=pk, user=request.user)
+    if request.method == 'POST':
+        course.delete()
+        return redirect('course_list')
+    return render(request, 'course_confirm_delete.html', {'course': course})
+
+@login_required
+def book_list_view(request):
+    books = Book.objects.filter(user=request.user)
+    return render(request, 'book_list.html', {'books': books})
+
+@login_required
+def book_create_view(request):
+    if request.method == 'POST':
+        form = BookForm(request.POST)
+        if form.is_valid():
+            book = form.save(commit=False)
+            book.user = request.user
+            book.save()
+            return redirect('book_list')
+    else:
+        form = BookForm()
+    return render(request, 'book_form.html', {'form': form})
+
+@login_required
+def book_edit_view(request, pk):
+    book = get_object_or_404(Book, pk=pk, user=request.user)
+    if request.method == 'POST':
+        form = BookForm(request.POST, instance=book)
+        if form.is_valid():
+            form.save()
+            return redirect('book_list')
+    else:
+        form = BookForm(instance=book)
+    return render(request, 'book_form.html', {'form': form, 'edit': True})
+
+@login_required
+def book_delete_view(request, pk):
+    book = get_object_or_404(Book, pk=pk, user=request.user)
+    if request.method == 'POST':
+        book.delete()
+        return redirect('book_list')
+    return render(request, 'book_confirm_delete.html', {'book': book})
+
+@login_required
+def keylesson_list_view(request):
+    keylessons = KeyLesson.objects.filter(user=request.user)
+    return render(request, 'keylesson_list.html', {'keylessons': keylessons})
+
+@login_required
+def keylesson_create_view(request):
+    if request.method == 'POST':
+        form = KeyLessonForm(request.POST)
+        if form.is_valid():
+            keylesson = form.save(commit=False)
+            keylesson.user = request.user
+            keylesson.save()
+            return redirect('keylesson_list')
+    else:
+        form = KeyLessonForm()
+    return render(request, 'keylesson_form.html', {'form': form})
+
+@login_required
+def keylesson_edit_view(request, pk):
+    keylesson = get_object_or_404(KeyLesson, pk=pk, user=request.user)
+    if request.method == 'POST':
+        form = KeyLessonForm(request.POST, instance=keylesson)
+        if form.is_valid():
+            form.save()
+            return redirect('keylesson_list')
+    else:
+        form = KeyLessonForm(instance=keylesson)
+    return render(request, 'keylesson_form.html', {'form': form, 'edit': True})
+
+@login_required
+def keylesson_delete_view(request, pk):
+    keylesson = get_object_or_404(KeyLesson, pk=pk, user=request.user)
+    if request.method == 'POST':
+        keylesson.delete()
+        return redirect('keylesson_list')
+    return render(request, 'keylesson_confirm_delete.html', {'keylesson': keylesson})
+
+@login_required
+def mistake_list_view(request):
+    mistakes = Mistake.objects.filter(user=request.user)
+    return render(request, 'mistake_list.html', {'mistakes': mistakes})
+
+@login_required
+def mistake_create_view(request):
+    if request.method == 'POST':
+        form = MistakeForm(request.POST)
+        if form.is_valid():
+            mistake = form.save(commit=False)
+            mistake.user = request.user
+            mistake.save()
+            return redirect('mistake_list')
+    else:
+        form = MistakeForm()
+    return render(request, 'mistake_form.html', {'form': form})
+
+@login_required
+def mistake_edit_view(request, pk):
+    mistake = get_object_or_404(Mistake, pk=pk, user=request.user)
+    if request.method == 'POST':
+        form = MistakeForm(request.POST, instance=mistake)
+        if form.is_valid():
+            form.save()
+            return redirect('mistake_list')
+    else:
+        form = MistakeForm(instance=mistake)
+    return render(request, 'mistake_form.html', {'form': form, 'edit': True})
+
+@login_required
+def mistake_delete_view(request, pk):
+    mistake = get_object_or_404(Mistake, pk=pk, user=request.user)
+    if request.method == 'POST':
+        mistake.delete()
+        return redirect('mistake_list')
+    return render(request, 'mistake_confirm_delete.html', {'mistake': mistake})
+
+@login_required
+def fetch_mt5_trades_view(request):
+    """Fetch trades for the selected MT5 account"""
+    selected_account_id = request.session.get('selected_account_id')
+    
+    if not selected_account_id:
+        messages.error(request, 'No account selected.')
+        return redirect('dashboard')
+    
+    try:
+        account = Account.objects.get(id=selected_account_id, user=request.user)
+        
+        if not account.mt5_account_number:
+            messages.error(request, 'Selected account is not linked to MT5.')
+            return redirect('dashboard')
+        
+        # This would require re-authentication for security
+        # For now, show a message that this feature needs MT5 credentials
+        messages.info(request, 'MT5 trade refresh requires re-authentication. Please use the MT5 fetch tool.')
+        return redirect('dashboard')
+        
+    except Account.DoesNotExist:
+        messages.error(request, 'Account not found.')
+        return redirect('dashboard')

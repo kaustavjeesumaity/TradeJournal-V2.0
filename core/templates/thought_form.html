@@ -1,0 +1,403 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .workspace-layout {
+    display: flex;
+    min-height: 80vh;
+    background: #f7f8fa;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    overflow: hidden;
+  }
+  .sidebar {
+    width: 220px;
+    background: #f4f5f7;
+    border-right: 1px solid #e0e0e0;
+    padding: 16px 10px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sidebar .breadcrumb {
+    font-size: 0.98em;
+    color: #888;
+    margin-bottom: 10px;
+  }
+  .sidebar .page-tree {
+    font-size: 1em;
+    margin-bottom: 18px;
+  }
+  .sidebar .page-tree ul {
+    list-style: none;
+    padding-left: 16px;
+  }
+  .sidebar .page-tree li {
+    margin-bottom: 4px;
+    cursor: pointer;
+  }
+  .sidebar .page-table {
+    font-size: 0.97em;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    padding: 6px 8px;
+  }
+  .sidebar .page-table th, .sidebar .page-table td {
+    padding: 2px 6px;
+    border-bottom: 1px solid #eee;
+  }
+  .block-editor-pane {
+    flex: 1;
+    padding: 0 0 0 0;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .block-toolbar {
+    display: flex;
+    gap: 2px;
+    background: #f4f5f7;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 6px 8px 4px 8px;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .block-toolbar button, .block-toolbar label {
+    margin: 0 2px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    padding: 3px 7px;
+    font-size: 1.08rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .block-toolbar button:hover, .block-toolbar label:hover {
+    background: #e6e9ef;
+  }
+  .block-list {
+    flex: 1;
+    padding: 18px 24px 12px 24px;
+    background: #fff;
+    overflow-y: auto;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .block {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: #fafbfc;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    min-height: 36px;
+    position: relative;
+    transition: box-shadow 0.15s;
+  }
+  .block.dragging {
+    opacity: 0.5;
+    box-shadow: 0 2px 12px #0052cc22;
+  }
+  .block .drag-handle {
+    cursor: grab;
+    font-size: 1.2em;
+    color: #b3bac5;
+    margin-right: 4px;
+    user-select: none;
+  }
+  .block .block-content[contenteditable="true"] {
+    outline: none;
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    font-size: 1.08em;
+    padding: 0;
+  }
+  .block .block-type-switch {
+    margin-right: 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background: #f4f5f7;
+    font-size: 0.98em;
+    cursor: pointer;
+    padding: 2px 6px;
+  }
+  .block img {
+    max-width: 220px;
+    max-height: 120px;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+    margin: 4px 0;
+  }
+  .block-embed {
+    width: 100%;
+    min-height: 40px;
+    background: #f7f8fa;
+    border: 1px dashed #b3bac5;
+    border-radius: 4px;
+    padding: 8px;
+    color: #888;
+    font-size: 0.98em;
+  }
+  .block-toggle {
+    width: 100%;
+    background: #f4f5f7;
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #0052cc;
+    margin-bottom: 2px;
+  }
+  .block-toggle-content {
+    margin-left: 18px;
+    margin-top: 4px;
+    display: none;
+  }
+  .block-toggle.open .block-toggle-content {
+    display: block;
+  }
+  .add-block-btn {
+    margin: 12px auto 0 auto;
+    display: block;
+    background: #e6e9ef;
+    color: #0052cc;
+    border: 1px solid #b3bac5;
+    border-radius: 4px;
+    padding: 5px 18px;
+    font-size: 1.08em;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .add-block-btn:hover {
+    background: #d2e0fa;
+  }
+</style>
+<div class="container my-4">
+  <div class="workspace-layout">
+    <!-- Sidebar: Nested Pages, Breadcrumb, Table -->
+    <div class="sidebar">
+      <div class="breadcrumb">Home &gt; My Journal &gt; May 2025</div>
+      <div class="page-tree">
+        <b>Pages</b>
+        <ul>
+          <li>My Journal
+            <ul>
+              <li><b>May 2025</b></li>
+              <li>April 2025</li>
+            </ul>
+          </li>
+          <li>Team Playbook</li>
+          <li>Crypto Patterns</li>
+        </ul>
+      </div>
+      <div class="page-table">
+        <b>All Pages</b>
+        <table style="width:100%;font-size:0.97em;">
+          <tr><th>Page</th><th>Type</th></tr>
+          <tr><td>May 2025</td><td>Journal</td></tr>
+          <tr><td>Team Playbook</td><td>Guide</td></tr>
+          <tr><td>Crypto Patterns</td><td>Patterns</td></tr>
+        </table>
+      </div>
+    </div>
+    <!-- Block-Based Editor -->
+    <div class="block-editor-pane"></div>
+      <div class="block-toolbar">
+        <button type="button" onclick="addBlock('heading')">H</button>
+        <button type="button" onclick="addBlock('paragraph')">¶</button>
+        <button type="button" onclick="addBlock('bulleted')">• List</button>
+        <button type="button" onclick="addBlock('numbered')">1. List</button>
+        <button type="button" onclick="addBlock('toggle')">Toggle</button>
+        <button type="button" onclick="addBlock('image')">🖼️</button>
+        <button type="button" onclick="addBlock('embed')">Embed</button>
+      </div>
+      <div class="block-list" id="blockList"></div>
+      <button class="add-block-btn" onclick="addBlock()">+ Add Block</button>
+    </div>
+  </div>
+</div>
+<script>
+// --- Backend-integrated Block & Page Editor ---
+let currentPageId = null;
+let blocks = [];
+let pages = [];
+let sections = [];
+
+async function fetchPages() {
+  const res = await fetch('/api/pages/');
+  pages = await res.json();
+  renderSidebar();
+}
+
+async function fetchBlocks(pageId) {
+  const res = await fetch(`/api/blocks/?page=${pageId}`);
+  blocks = await res.json();
+  renderBlocks();
+}
+
+async function fetchSections() {
+  const res = await fetch('/api/sections/');
+  sections = await res.json();
+}
+
+function renderSidebar() {
+  // Render breadcrumbs, page tree, and table view from pages[]
+  // ...
+}
+
+function renderBlocks() {
+  const list = document.getElementById('blockList');
+  list.innerHTML = '';
+  blocks.forEach((block, idx) => {
+    const div = document.createElement('div');
+    div.className = 'block';
+    div.setAttribute('draggable', 'true');
+    div.dataset.idx = idx;
+    div.innerHTML = `
+      <span class="drag-handle" title="Drag">☰</span>
+      <select class="block-type-switch" onchange="switchBlockType(${idx}, this.value)">
+        <option value="heading" ${block.type==='heading'?'selected':''}>Heading</option>
+        <option value="paragraph" ${block.type==='paragraph'?'selected':''}>Paragraph</option>
+        <option value="bulleted" ${block.type==='bulleted'?'selected':''}>Bulleted List</option>
+        <option value="numbered" ${block.type==='numbered'?'selected':''}>Numbered List</option>
+        <option value="toggle" ${block.type==='toggle'?'selected':''}>Toggle</option>
+        <option value="image" ${block.type==='image'?'selected':''}>Image</option>
+        <option value="embed" ${block.type==='embed'?'selected':''}>Embed</option>
+      </select>
+      <div class="block-content" contenteditable="true" oninput="updateBlockContent(${idx}, this)">${block.type==='image'||block.type==='embed'?'':escapeHtml(block.content)}</div>
+      ${block.type==='image'?`<input type='file' accept='image/*' onchange='uploadBlockImage(event,${idx})'>${block.image?`<img src='${block.image}'/>`:''}`:''}
+      ${block.type==='embed'?`<input type='text' placeholder='Paste URL' value='${block.embed_url||''}' oninput='updateBlockContent(${idx}, this)'><div class='block-embed'>${block.embed_url?`Embed: ${block.embed_url}`:'Paste a URL above'}</div>`:''}
+      ${block.type==='toggle'?`<div class='block-toggle' onclick='toggleBlock(${idx})'>${block.content.split('\n')[0]||'Toggle Title'}</div><div class='block-toggle-content' style='display:none;'>${block.content.split('\n').slice(1).join('<br>')}</div>`:''}
+      <button style="margin-left:8px;" onclick="removeBlock(${idx})">✕</button>
+    `;
+    // Drag events
+    div.addEventListener('dragstart', e => {
+      div.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', idx);
+    });
+    div.addEventListener('dragend', e => {
+      div.classList.remove('dragging');
+    });
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      div.style.boxShadow = '0 2px 12px #0052cc22';
+    });
+    div.addEventListener('dragleave', e => {
+      div.style.boxShadow = '';
+    });
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      div.style.boxShadow = '';
+      const from = +e.dataTransfer.getData('text/plain');
+      moveBlock(from, idx);
+    });
+    list.appendChild(div);
+  });
+}
+
+async function addBlock(type='paragraph') {
+  if (!currentPageId) return;
+  const res = await fetch('/api/blocks/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({type, content: '', page: currentPageId, order: blocks.length})
+  });
+  const newBlock = await res.json();
+  blocks.push(newBlock);
+  renderBlocks();
+}
+
+async function removeBlock(idx) {
+  const block = blocks[idx];
+  await fetch(`/api/blocks/${block.id}/`, {method: 'DELETE'});
+  blocks.splice(idx,1);
+  renderBlocks();
+}
+
+async function updateBlockContent(idx, el) {
+  const block = blocks[idx];
+  let content = (block.type==='embed') ? el.value : el.innerText;
+  await fetch(`/api/blocks/${block.id}/`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({content})
+  });
+  blocks[idx].content = content;
+}
+
+async function switchBlockType(idx, type) {
+  const block = blocks[idx];
+  await fetch(`/api/blocks/${block.id}/`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({type, content: ''})
+  });
+  blocks[idx].type = type;
+  blocks[idx].content = '';
+  renderBlocks();
+}
+
+async function moveBlock(from, to) {
+  if (from===to) return;
+  const b = blocks.splice(from,1)[0];
+  blocks.splice(to,0,b);
+  // Update order in backend
+  await fetch('/api/blocks/reorder/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({order: blocks.map((blk,i)=>({id:blk.id, order:i}))})
+  });
+  renderBlocks();
+}
+
+async function uploadBlockImage(e, idx) {
+  const block = blocks[idx];
+  const file = e.target.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`/api/blocks/${block.id}/`, {
+    method: 'PATCH',
+    body: formData
+  });
+  const updated = await res.json();
+  blocks[idx].content = updated.image;
+  renderBlocks();
+}
+
+function toggleBlock(idx) {
+  const blockDiv = document.querySelectorAll('.block')[idx];
+  const toggle = blockDiv.querySelector('.block-toggle');
+  const content = blockDiv.querySelector('.block-toggle-content');
+  if (content.style.display==='block') {
+    content.style.display='none';
+    toggle.classList.remove('open');
+  } else {
+    content.style.display='block';
+    toggle.classList.add('open');
+  }
+}
+
+function escapeHtml(str) {
+  return (str||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Initial load
+fetchPages().then(() => {
+  // Set currentPageId to first page or as needed
+  if (pages.length) {
+    currentPageId = pages[0].id;
+    fetchBlocks(currentPageId);
+  }
+  fetchSections();
+});
+</script>
+{% endblock %}
