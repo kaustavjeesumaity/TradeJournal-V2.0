@@ -10,8 +10,7 @@
 <div class="container my-4">
   <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
-      <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white d-flex align-items-center">
+      <div class="card shadow-sm">        <div class="card-header bg-primary text-white d-flex align-items-center">
           <i class="bi bi-person-plus me-2"></i> {% if account %}Edit Account{% else %}Add Account{% endif %}
         </div>        <div class="card-body">
           <form method="post" id="accountForm">
@@ -26,7 +25,7 @@
             {% endfor %}
             <div class="d-flex justify-content-between align-items-center mt-4">
               <button type="submit" class="btn btn-success px-4"><i class="bi bi-check-circle me-1"></i>Save</button>
-              <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Cancel</a>
+              <a href="{% if account %}{% url 'account_list' %}{% else %}{% url 'dashboard' %}{% endif %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Cancel</a>
             </div>
           </form>
         </div>
@@ -56,30 +55,90 @@
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const accountSourceRadios = document.querySelectorAll('input[name="account_source"]');
+    console.log('Account form script loaded');
+      const accountSourceRadios = document.querySelectorAll('input[name="account_source"]');
     const manualFields = document.querySelectorAll('.manual-field');
     
-    function toggleFields() {
+    console.log('Found account source radios:', accountSourceRadios.length);
+    console.log('Found manual fields:', manualFields.length);
+    
+    // Log each manual field found
+    manualFields.forEach((field, index) => {
+        console.log(`Manual field ${index}:`, field.name, field.type, field.required);
+    });    function toggleFields() {
         const selectedSource = document.querySelector('input[name="account_source"]:checked');
+        console.log('Selected source:', selectedSource ? selectedSource.value : 'none');
+        
         if (selectedSource) {
             if (selectedSource.value === 'mt5') {
+                console.log('Hiding manual fields for MT5');
                 manualFields.forEach(field => {
-                    field.closest('.mb-3').style.display = 'none';
+                    const container = field.closest('.mb-3');
+                    if (container) {
+                        container.style.display = 'none';
+                    }
+                    // Store original required state and remove required attribute
+                    if (field.hasAttribute('required')) {
+                        field.setAttribute('data-was-required', 'true');
+                        field.removeAttribute('required');
+                        console.log(`Removed required from ${field.name}`);
+                    }
+                    // Clear values for form inputs
+                    if ((field.tagName === 'INPUT' && field.type !== 'radio' && field.type !== 'hidden') || 
+                        field.tagName === 'SELECT' || 
+                        field.tagName === 'TEXTAREA') {
+                        field.value = '';
+                    }
                 });
             } else {
+                console.log('Showing manual fields for manual entry');
                 manualFields.forEach(field => {
-                    field.closest('.mb-3').style.display = 'block';
+                    const container = field.closest('.mb-3');
+                    if (container) {
+                        container.style.display = 'block';
+                    }
+                    // Restore required attribute if it was previously required
+                    if (field.hasAttribute('data-was-required')) {
+                        field.setAttribute('required', 'required');
+                        field.removeAttribute('data-was-required');
+                        console.log(`Restored required to ${field.name}`);
+                    }
                 });
             }
         }
     }
-    
+
+    // Add event listeners to radio buttons
     accountSourceRadios.forEach(radio => {
-        radio.addEventListener('change', toggleFields);
+        radio.addEventListener('change', function() {
+            console.log('Radio changed to:', this.value);
+            toggleFields();
+        });
     });
-    
+
     // Initial toggle
     toggleFields();
+
+    // Ensure form can submit normally
+    const form = document.getElementById('accountForm');
+    if (form) {
+        console.log('Form found, ensuring normal submission');
+        // Remove any blocking attributes or handlers
+        form.removeAttribute('onsubmit');
+        
+        // Remove jQuery handlers if present
+        if (window.jQuery) {
+            $(form).off('submit');
+        }
+        
+        // Add a submit handler to log submission
+        form.addEventListener('submit', function(e) {
+            console.log('Form submitting...');
+            // Don't prevent default - let it submit normally
+        });
+    } else {
+        console.error('Form with id "accountForm" not found');
+    }
 });
 </script>
 {% endblock %}

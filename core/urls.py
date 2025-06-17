@@ -8,7 +8,8 @@ from .models import Trade
 urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),
-    path('logout/', views.logout_view, name='logout'),    path('dashboard/', views.dashboard_view, name='dashboard'),    path('accounts/create/', views.account_create_view, name='account_create'),
+    path('logout/', views.logout_view, name='logout'),    path('dashboard/', views.dashboard_view, name='dashboard'),    path('accounts/', views.account_list_view, name='account_list'),
+    path('accounts/create/', views.account_create_view, name='account_create'),
     path('accounts/mt5/connect/', views.mt5_account_connect_view, name='mt5_account_connect'),
     path('accounts/mt5/refresh/', views.fetch_mt5_trades_view, name='fetch_mt5_trades'),
     path('trades/create/', views.trade_create_view, name='trade_create'),

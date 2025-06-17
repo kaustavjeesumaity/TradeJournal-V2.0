@@ -31,6 +31,33 @@ class AccountForm(forms.ModelForm):
         self.fields['broker'].widget.attrs.update({'class': 'form-control manual-field'})
         self.fields['leverage'].widget.attrs.update({'class': 'form-control manual-field'})
 
+        # Dynamically set required fields based on account_source
+        data = args[0] if args else None
+        account_source = None
+        if data:
+            account_source = data.get('account_source')
+        elif self.initial.get('account_source'):
+            account_source = self.initial.get('account_source')
+        else:
+            account_source = self.fields['account_source'].initial
+
+        if account_source == 'mt5':
+            # Make manual fields not required for MT5
+            self.fields['name'].required = False
+            self.fields['balance'].required = False
+            self.fields['currency'].required = False
+            self.fields['account_type'].required = False
+            self.fields['broker'].required = False
+            self.fields['leverage'].required = False
+        else:
+            # Manual: require name and balance
+            self.fields['name'].required = True
+            self.fields['balance'].required = True
+            self.fields['currency'].required = True
+            self.fields['account_type'].required = True
+            self.fields['broker'].required = False
+            self.fields['leverage'].required = False
+
     def clean(self):
         cleaned_data = super().clean()
         account_source = cleaned_data.get('account_source')
@@ -47,6 +74,20 @@ class AccountForm(forms.ModelForm):
                 raise forms.ValidationError('Initial balance is required for manual accounts.')
         
         return cleaned_data
+
+    def save(self, commit=True):
+        account_source = self.cleaned_data.get('account_source')
+        instance = super().save(commit=False)
+        if account_source == 'mt5':
+            # Provide dummy values for required fields to pass model validation
+            if not instance.balance:
+                instance.balance = 0
+            if not instance.name:
+                instance.name = 'MT5 Account'
+            # You may want to set other fields as well if your model requires them
+        if commit:
+            instance.save()
+        return instance
 
 
 class MT5AccountForm(forms.Form):

@@ -266,8 +266,8 @@
               <li><a class="dropdown-item" href="?account={{ account.id }}">{{ account.name }} ({{ account.currency }})</a></li>
             {% empty %}
               <li><span class="dropdown-item-text text-muted">No accounts yet</span></li>
-            {% endfor %}
-            <li><hr class="dropdown-divider"></li>
+            {% endfor %}            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'account_list' %}"><i class="bi bi-gear"></i> Manage Accounts</a></li>
             <li><a class="dropdown-item" href="{% url 'account_create' %}"><i class="bi bi-plus-circle"></i> Add Account</a></li>
             {% if selected_account and selected_account.mt5_account_number %}
               <li><a class="dropdown-item" href="{% url 'fetch_mt5_trades' %}"><i class="bi bi-arrow-clockwise"></i> Refresh MT5</a></li>

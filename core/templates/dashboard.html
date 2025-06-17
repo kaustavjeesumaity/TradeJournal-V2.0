@@ -70,7 +70,7 @@
     }  }
 </style>
 <div class="container my-4">
-  <div class="d-flex justify-content-between align-items-center mb-3"></div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="fw-bold">Dashboard</h2>
     <div>
       <span class="me-2">Welcome, <strong>{{ user.email }}</strong></span>
@@ -78,6 +78,14 @@
       <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm ms-2">Logout</a>
     </div>
   </div>
+
+  {% if form_success %}
+    <div class="alert alert-success">{{ form_success }}</div>
+  {% endif %}
+  {% if form_error %}
+    <div class="alert alert-danger">{{ form_error }}</div>
+  {% endif %}
+
   <div class="row mb-4">
     <div class="col-md-12">
       <div class="card shadow-sm mb-3">
@@ -89,13 +97,20 @@
     </div>
   </div>
 
-  <div class="d-flex flex-wrap gap-2 mb-3">
-    <a href="{% url 'trade_create' %}" class="btn btn-primary btn-sm">Add Trade</a>
-    <a href="{% url 'trade_import_csv' %}" class="btn btn-secondary btn-sm">Import Trades (CSV)</a>
-    <a href="{% url 'trade_plan_create' %}" class="btn btn-warning btn-sm">Add Trade Plan</a>
-    <a href="{% url 'trade_export_csv' %}" class="btn btn-secondary btn-sm">Export Trades (CSV)</a>
-    <a href="{% url 'position_size_calculator' %}" class="btn btn-info btn-sm">Position Size Calculator</a>
-    <a href="{% url 'fetch_mt5_trades' %}" class="btn btn-success btn-sm">Fetch MT5 Trades</a>
+  <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+    <a href="{% url 'trade_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Add Trade</a>
+    <a href="{% url 'trade_import_csv' %}" class="btn btn-secondary btn-sm"><i class="bi bi-upload me-1"></i>Import Trades (CSV)</a>
+    <a href="{% url 'trade_plan_create' %}" class="btn btn-warning btn-sm"><i class="bi bi-journal-plus me-1"></i>Add Trade Plan</a>
+    <a href="{% url 'trade_export_csv' %}" class="btn btn-secondary btn-sm"><i class="bi bi-download me-1"></i>Export Trades (CSV)</a>
+    <!-- <a href="{% url 'position_size_calculator' %}" class="btn btn-info btn-sm"><i class="bi bi-calculator me-1"></i>Position Size Calculator</a>
+    <a href="{% url 'fetch_mt5_trades' %}" class="btn btn-success btn-sm"><i class="bi bi-cloud-arrow-down me-1"></i>Fetch MT5 Trades</a> -->
+    <!-- Full forms section as icon buttons -->
+    <!-- <span class="ms-3 d-flex gap-2 align-items-center"> -->
+      <a href="{% url 'milestone_create' %}" class="btn btn-outline-primary btn-sm" title="Milestone Form"><i class="bi bi-flag me-1"></i>Milestone</a>
+      <a href="{% url 'achievement_create' %}" class="btn btn-outline-warning btn-sm" title="Achievement Form"><i class="bi bi-trophy me-1"></i>Achievement</a>
+      <a href="{% url 'lesson_create' %}" class="btn btn-outline-info btn-sm" title="Lesson Form"><i class="bi bi-journal-text me-1"></i>Lesson</a>
+      <a href="{% url 'review_create' %}" class="btn btn-outline-dark btn-sm" title="Review Form"><i class="bi bi-clipboard-check me-1"></i>Review</a>
+    <!-- </span> -->
   </div>
 
   <form method="get" class="row g-2 mb-3 align-items-end">

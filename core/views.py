@@ -108,6 +108,58 @@ def dashboard_view(request):
     if sort:
         trades = trades.order_by(sort)
 
+    # --- Milestone, Achievement, Lesson, Review forms ---
+    milestone_form = MilestoneForm()
+    achievement_form = AchievementForm()
+    lesson_form = LessonForm()
+    review_form = ReviewForm()
+    form_success = None
+    form_error = None
+
+    if request.method == 'POST':
+        if 'milestone_submit' in request.POST:
+            milestone_form = MilestoneForm(request.POST)
+            if milestone_form.is_valid():
+                milestone = milestone_form.save(commit=False)
+                milestone.save()
+                form_success = 'Milestone added!'
+                milestone_form = MilestoneForm()
+            else:
+                form_error = 'Please correct the errors in the milestone form.'
+        elif 'achievement_submit' in request.POST:
+            achievement_form = AchievementForm(request.POST)
+            if achievement_form.is_valid():
+                achievement = achievement_form.save(commit=False)
+                achievement.save()
+                form_success = 'Achievement added!'
+                achievement_form = AchievementForm()
+            else:
+                form_error = 'Please correct the errors in the achievement form.'
+        elif 'lesson_submit' in request.POST:
+            lesson_form = LessonForm(request.POST)
+            if lesson_form.is_valid():
+                lesson = lesson_form.save(commit=False)
+                lesson.save()
+                form_success = 'Lesson added!'
+                lesson_form = LessonForm()
+            else:
+                form_error = 'Please correct the errors in the lesson form.'
+        elif 'review_submit' in request.POST:
+            review_form = ReviewForm(request.POST)
+            if review_form.is_valid():
+                review = review_form.save(commit=False)
+                review.save()
+                form_success = 'Review added!'
+                review_form = ReviewForm()
+            else:
+                form_error = 'Please correct the errors in the review form.'
+
+    # Recent items for dashboard summary
+    recent_milestones = Milestone.objects.order_by('-achieved_at')[:5]
+    recent_achievements = Achievement.objects.order_by('-achieved_at')[:5]
+    recent_lessons = Lesson.objects.order_by('-learned_at')[:5]
+    recent_reviews = Review.objects.order_by('-created_at')[:5]
+
     # Pagination
     paginator = Paginator(trades, 10)  # Show 10 trades per page
     page_number = request.GET.get('page')
@@ -152,8 +204,14 @@ def dashboard_view(request):
         ]) / total_trades
         if total_trades else 0
     )
-    pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in trades.order_by('exit_date') if t.exit_date]
-    pnl_values = [float(t.pnl or 0) for t in trades.order_by('exit_date')]
+    # --- Cumulative P&L for chart ---
+    pnl_trades = list(trades.order_by('exit_date'))
+    pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in pnl_trades if t.exit_date]
+    pnl_values = []
+    cum_pnl = 0
+    for t in pnl_trades:
+        cum_pnl += float(getattr(t, 'net_pnl', t.pnl) or 0)
+        pnl_values.append(round(cum_pnl, 2))
 
     # Instrument analytics
     instrument_stats = []
@@ -201,11 +259,15 @@ def dashboard_view(request):
         'sort': sort,
     }
 
+    # --- Force trade table to show latest entry_date first ---
+    trades_for_table = trades.order_by('-entry_date')
+    page_obj = Paginator(trades_for_table, 10).get_page(page_number)
+
     return render(request, 'dashboard.html', {
         'accounts': accounts,
         'selected_account': selected_account,
         'account_summaries': account_summaries,
-        'trades': page_obj.object_list if 'page_obj' in locals() else trades,
+        'trades': page_obj.object_list if 'page_obj' in locals() else trades_for_table,
         'page_obj': page_obj if 'page_obj' in locals() else None,
         'total_pnl': total_pnl,
         'win_rate': win_rate,
@@ -220,6 +282,16 @@ def dashboard_view(request):
         'instrument_list': instrument_list,
         'account_options': account_options,
         'default_account': default_account,
+        'milestone_form': milestone_form,
+        'achievement_form': achievement_form,
+        'lesson_form': lesson_form,
+        'review_form': review_form,
+        'form_success': form_success,
+        'form_error': form_error,
+        'recent_milestones': recent_milestones,
+        'recent_achievements': recent_achievements,
+        'recent_lessons': recent_lessons,
+        'recent_reviews': recent_reviews,
     })
 
 @login_required
@@ -260,9 +332,14 @@ def advanced_analytics_view(request):
     if sort:
         trades = trades.order_by(sort)
 
-    # PnL over time
-    pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in trades.order_by('exit_date')]
-    pnl_values = [float(t.net_pnl or 0) for t in trades.order_by('exit_date')]
+    # --- Cumulative P&L for chart ---
+    pnl_trades = list(trades.order_by('exit_date'))
+    pnl_dates = [t.exit_date.strftime('%Y-%m-%d') for t in pnl_trades if t.exit_date]
+    pnl_values = []
+    cum_pnl = 0
+    for t in pnl_trades:
+        cum_pnl += float(getattr(t, 'net_pnl', t.pnl) or 0)
+        pnl_values.append(round(cum_pnl, 2))
 
     # Win/Loss ratio
     win_count = trades.filter(exit_price__gt=F('entry_price')).count()
@@ -275,14 +352,16 @@ def advanced_analytics_view(request):
         holding_hours = (t.exit_date - t.entry_date).total_seconds() / 3600.0 if t.exit_date and t.entry_date else 0
         holding_map[t.instrument].append(holding_hours)
     holding_labels = list(holding_map.keys())
-    holding_data = [round(sum(v)/len(v), 2) if v else 0 for v in holding_map.values()]    # Tag performance
+    holding_data = [round(sum(v)/len(v), 2) if v else 0 for v in holding_map.values()]
+    # Tag performance
     tag_map = defaultdict(list)
     for t in trades:
         if hasattr(t, 'tags'):
             for tag in t.tags.all():
                 tag_map[str(tag)].append(t.net_pnl or 0)
     tag_labels = list(tag_map.keys())
-    tag_data = [round(sum(v), 2) for v in tag_map.values()]    # Session performance
+    tag_data = [round(sum(v), 2) for v in tag_map.values()]
+    # Session performance
     session_map = defaultdict(list)
     for t in trades:
         session = getattr(t, 'session', None)
@@ -349,9 +428,9 @@ def account_create_view(request):
         if form.is_valid():
             account_source = form.cleaned_data.get('account_source')
             if account_source == 'mt5':
-                # Pass account name as GET param for pre-filling
-                account_name = form.cleaned_data.get('name', '')
-                return redirect(f"{reverse('mt5_account_connect')}?account_name={account_name}")
+                # Only show a message and redirect to MT5 connect, do not pass name
+                messages.info(request, 'Please enter your MT5 credentials to connect your account.')
+                return redirect(reverse('mt5_account_connect'))
             else:
                 # Create manual account
                 account = form.save(commit=False)
@@ -367,6 +446,10 @@ def account_create_view(request):
 @login_required 
 def mt5_account_connect_view(request):
     """Handle MT5 account connection"""
+    existing_mt5_accounts = Account.objects.filter(
+        user=request.user,
+        mt5_account_number__isnull=False
+    ).order_by('-mt5_last_fetch')
     if request.method == 'POST':
         form = MT5AccountForm(request.POST)
         if form.is_valid():
@@ -374,24 +457,17 @@ def mt5_account_connect_view(request):
                 if mt5 is None:
                     messages.error(request, 'MetaTrader 5 library is not installed.')
                     return redirect('account_create')
-                
-                # Initialize MT5 connection
                 if not mt5.initialize():
                     messages.error(request, 'Failed to initialize MetaTrader 5.')
                     return redirect('account_create')
-                
-                # Login to MT5
                 login_result = mt5.login(
                     login=int(form.cleaned_data['mt5_account']),
                     server=form.cleaned_data['mt5_server'],
                     password=form.cleaned_data['mt5_password']
                 )
-                
                 if login_result:
-                    # Get account info
                     account_info = mt5.account_info()
                     if account_info:
-                        # Create account with MT5 data
                         account = Account.objects.create(
                             user=request.user,
                             name=form.cleaned_data['account_name'],
@@ -406,41 +482,35 @@ def mt5_account_connect_view(request):
                             mt5_server=form.cleaned_data['mt5_server'],
                             mt5_last_fetch=timezone.now()
                         )
-                        
                         messages.success(request, f'MT5 account "{account.name}" connected successfully!')
-                        
-                        # Optionally fetch recent trades
                         try:
                             fetch_mt5_trades_for_account(account)
                             messages.info(request, 'Recent trades have been imported from MT5.')
                         except Exception as e:
                             messages.warning(request, f'Account created but failed to import trades: {str(e)}')
-                        
                         return redirect('dashboard')
                     else:
                         messages.error(request, 'Failed to get account information from MT5.')
                 else:
                     messages.error(request, 'Failed to login to MT5. Please check your credentials.')
-                
                 mt5.shutdown()
             except Exception as e:
                 messages.error(request, f'Error connecting to MT5: {str(e)}')
+        # Always re-render form with errors and existing accounts if not redirected
+        return render(request, 'mt5_account_form.html', {
+            'form': form,
+            'existing_mt5_accounts': existing_mt5_accounts
+        })
     else:
-        # Pre-fill account_name from GET param if present
         initial = {}
         account_name = request.GET.get('account_name')
         if account_name:
             initial['account_name'] = account_name
         form = MT5AccountForm(initial=initial)
-        # Get existing MT5 accounts for the user
-        existing_mt5_accounts = Account.objects.filter(
-            user=request.user,
-            mt5_account_number__isnull=False
-        ).order_by('-mt5_last_fetch')
-    return render(request, 'mt5_account_form.html', {
-        'form': form,
-        'existing_mt5_accounts': existing_mt5_accounts
-    })
+        return render(request, 'mt5_account_form.html', {
+            'form': form,
+            'existing_mt5_accounts': existing_mt5_accounts
+        })
 
 @login_required
 def trade_create_view(request):
@@ -471,23 +541,69 @@ def trade_create_view(request):
     return render(request, 'trade_form.html', {'form': form})
 
 @login_required
+def account_list_view(request):
+    """Account management page - list all accounts with edit/delete options"""
+    accounts = Account.objects.filter(user=request.user).order_by('-id')
+    
+    # Get summary stats for each account
+    account_data = []
+    mt5_count = 0
+    total_trades_count = 0
+    total_combined_pnl = 0
+    
+    for account in accounts:
+        trades = Trade.objects.filter(account=account)
+        total_trades = trades.count()
+        total_pnl = sum([t.net_pnl or 0 for t in trades])
+        
+        # Calculate win rate
+        winning_trades = trades.filter(net_pnl__gt=0).count()
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        
+        is_mt5 = bool(account.mt5_account_number)
+        if is_mt5:
+            mt5_count += 1
+        
+        total_trades_count += total_trades
+        total_combined_pnl += total_pnl
+        
+        account_data.append({
+            'account': account,
+            'total_trades': total_trades,
+            'total_pnl': total_pnl,
+            'win_rate': win_rate,
+            'is_mt5': is_mt5,
+            'last_trade': trades.order_by('-exit_date').first() if trades.exists() else None,
+        })
+    
+    return render(request, 'account_list.html', {
+        'account_data': account_data,
+        'mt5_count': mt5_count,
+        'total_trades_count': total_trades_count,
+        'total_combined_pnl': total_combined_pnl,
+    })
+
+@login_required
 def account_edit_view(request, pk):
     account = get_object_or_404(Account, pk=pk, user=request.user)
     if request.method == 'POST':
         form = AccountForm(request.POST, instance=account)
         if form.is_valid():
             form.save()
-            return redirect('dashboard')
+            messages.success(request, f'Account "{account.name}" updated successfully!')
+            return redirect('account_list')
     else:
         form = AccountForm(instance=account)
-    return render(request, 'account_form.html', {'form': form, 'edit': True})
+    return render(request, 'account_form.html', {'form': form, 'account': account})
 
 @login_required
 def account_delete_view(request, pk):
     account = get_object_or_404(Account, pk=pk, user=request.user)
     if request.method == 'POST':
+        account_name = account.name
         account.delete()
-        return redirect('dashboard')
+        messages.success(request, f'Account "{account_name}" deleted successfully!')
+        return redirect('account_list')
     return render(request, 'account_confirm_delete.html', {'account': account})
 
 @login_required
